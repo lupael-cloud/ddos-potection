@@ -568,6 +568,8 @@ class TrafficCollector:
         """Start sFlow collector"""
         port = port or settings.SFLOW_PORT
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Bind to all interfaces to receive sFlow data from routers
+        # This is intentional and secured by Docker network isolation
         sock.bind(('0.0.0.0', port))
         
         print(f"sFlow collector listening on port {port}")
@@ -591,6 +593,8 @@ class TrafficCollector:
         """Start IPFIX collector"""
         port = port or settings.IPFIX_PORT
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Bind to all interfaces to receive IPFIX data from routers
+        # This is intentional and secured by Docker network isolation
         sock.bind(('0.0.0.0', port))
         
         print(f"IPFIX collector listening on port {port}")
