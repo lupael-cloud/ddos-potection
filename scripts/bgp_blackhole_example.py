@@ -95,8 +95,7 @@ class BGPBlackholeClient:
         
         if exec_response.status_code == 200:
             print(f"✓ BGP blackhole active for {prefix}")
-            print(f"  → Route announced with next-hop 192.0.2.1")
-            print(f"  → Community tag: 65535:666")
+            print(f"  → Route announced using backend-configured BGP next-hop and communities")
             return mitigation_id
         else:
             print(f"✗ Failed to execute mitigation: {exec_response.text}")

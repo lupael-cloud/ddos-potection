@@ -385,15 +385,41 @@ def announce_bgp_blackhole(self, prefix: str, nexthop: str = None) -> bool:
 def _announce_exabgp(self, prefix: str, nexthop: str) -> bool:
     """Announce via ExaBGP"""
     from config import settings
+    import os
+    import errno
+    import ipaddress
+    
+    # Validate prefix format and reject control characters (e.g. newlines)
+    if not self._validate_prefix(prefix) or any(ord(ch) < 32 for ch in prefix):
+        print(f"ExaBGP error: Invalid or unsafe prefix: {prefix!r}")
+        return False
+    
+    # Validate nexthop is a valid IP address
+    try:
+        ipaddress.ip_address(nexthop)
+    except ValueError:
+        print(f"ExaBGP error: Invalid nexthop format: {nexthop}")
+        return False
     
     cmd_pipe = settings.EXABGP_CMD_PIPE
     community = settings.BGP_BLACKHOLE_COMMUNITY
     
-    with open(cmd_pipe, 'a') as f:
-        f.write(f'announce route {prefix} next-hop {nexthop} community [{community}]\n')
-    
-    print(f"BGP blackhole announced via ExaBGP: {prefix} -> {nexthop}")
-    return True
+    # Use non-blocking open to avoid hanging if ExaBGP is not running
+    try:
+        fd = os.open(cmd_pipe, os.O_WRONLY | os.O_NONBLOCK)
+        try:
+            command = f'announce route {prefix} next-hop {nexthop} community [{community}]\n'
+            os.write(fd, command.encode())
+            print(f"BGP blackhole announced via ExaBGP: {prefix} -> {nexthop}")
+            return True
+        finally:
+            os.close(fd)
+    except OSError as e:
+        if e.errno == errno.ENXIO:
+            print(f"ExaBGP error: No reader on pipe (ExaBGP not running?)")
+        else:
+            print(f"ExaBGP error: Failed to write to pipe: {e}")
+        return False
 
 def _announce_frr(self, prefix: str, nexthop: str) -> bool:
     """Announce via FRR"""
@@ -457,12 +483,30 @@ def withdraw_bgp_blackhole(self, prefix: str) -> bool:
 def _withdraw_exabgp(self, prefix: str) -> bool:
     """Withdraw via ExaBGP"""
     from config import settings
+    import os
+    import errno
     
-    with open(settings.EXABGP_CMD_PIPE, 'a') as f:
-        f.write(f'withdraw route {prefix}\n')
+    # Validate prefix format and reject control characters (e.g. newlines)
+    if not self._validate_prefix(prefix) or any(ord(ch) < 32 for ch in prefix):
+        print(f"ExaBGP error: Invalid or unsafe prefix: {prefix!r}")
+        return False
     
-    print(f"BGP blackhole withdrawn via ExaBGP: {prefix}")
-    return True
+    # Use non-blocking open to avoid hanging if ExaBGP is not running
+    try:
+        fd = os.open(settings.EXABGP_CMD_PIPE, os.O_WRONLY | os.O_NONBLOCK)
+        try:
+            command = f'withdraw route {prefix}\n'
+            os.write(fd, command.encode())
+            print(f"BGP blackhole withdrawn via ExaBGP: {prefix}")
+            return True
+        finally:
+            os.close(fd)
+    except OSError as e:
+        if e.errno == errno.ENXIO:
+            print(f"ExaBGP error: No reader on pipe")
+        else:
+            print(f"ExaBGP error: {e}")
+        return False
 
 def _withdraw_frr(self, prefix: str) -> bool:
     """Withdraw via FRR"""
@@ -951,5 +995,5 @@ def validate_prefix_ownership(prefix: str, isp_id: int) -> bool:
 For help with BGP blackholing:
 - Check logs: `sudo journalctl -u exabgp -f`
 - Platform logs: `docker-compose logs -f backend`
-- GitHub Issues: [https://github.com/i4edubd/ddos-protection/issues](https://github.com/i4edubd/ddos-protection/issues)
+- GitHub Issues: [https://github.com/i4edubd/ddos-potection/issues](https://github.com/i4edubd/ddos-potection/issues)
 - Contact your ISP's NOC for BGP-specific issues

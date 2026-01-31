@@ -172,8 +172,8 @@ For advanced DDoS mitigation using BGP-based traffic dropping:
    # Install ExaBGP
    pip3 install exabgp
    
-   # Configure (see docs/BGP-RTBH.md for details)
-   sudo cp docs/examples/exabgp.conf /etc/exabgp/
+   # Configure ExaBGP (see docs/BGP-RTBH.md for the example config)
+   # Create /etc/exabgp/exabgp.conf based on the example in docs/BGP-RTBH.md
    
    # Enable in platform
    echo "BGP_ENABLED=true" >> backend/.env

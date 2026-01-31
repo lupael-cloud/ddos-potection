@@ -95,6 +95,7 @@ async def execute_mitigation(
     
     success = False
     error_message = None
+    is_client_error = False
     
     # Execute mitigation based on action_type
     try:
@@ -104,6 +105,9 @@ async def execute_mitigation(
             protocol = mitigation.details.get('protocol')
             if ip:
                 success = service.apply_iptables_rule('block', ip, protocol)
+            else:
+                error_message = "Firewall mitigation requires an 'ip' address in mitigation details"
+                is_client_error = True
         
         elif mitigation.action_type == "bgp_blackhole":
             # Announce BGP blackhole (RTBH)
@@ -113,6 +117,7 @@ async def execute_mitigation(
                 success = service.announce_bgp_blackhole(prefix, nexthop)
             else:
                 error_message = "BGP blackhole requires a 'prefix' in CIDR notation (e.g., 192.0.2.1/32) in mitigation details"
+                is_client_error = True
         
         elif mitigation.action_type == "flowspec":
             # Send FlowSpec update
@@ -123,6 +128,7 @@ async def execute_mitigation(
         
         else:
             error_message = f"Unknown action type: {mitigation.action_type}"
+            is_client_error = True
     
     except Exception as e:
         error_message = str(e)
@@ -132,10 +138,16 @@ async def execute_mitigation(
         db.commit()
         return {"message": "Mitigation executed successfully", "status": "active"}
     else:
-        mitigation.status = "failed"
-        db.commit()
+        # Determine HTTP status code based on error type
+        status_code = 400 if is_client_error else 500
+        
+        # Only mark as failed for server errors, not client errors
+        if status_code >= 500:
+            mitigation.status = "failed"
+            db.commit()
+        
         raise HTTPException(
-            status_code=500, 
+            status_code=status_code,
             detail=f"Mitigation execution failed: {error_message or 'Unknown error'}"
         )
 
@@ -197,6 +209,15 @@ async def stop_mitigation(
         db.commit()
         return {"message": "Mitigation stopped successfully", "status": "completed"}
     else:
+        # Persist the failure state so operators can see it
+        mitigation.status = "failed"
+        if error_message:
+            # Store error in details for debugging
+            if not mitigation.details:
+                mitigation.details = {}
+            mitigation.details['stop_error'] = error_message
+        db.commit()
+        
         raise HTTPException(
             status_code=500,
             detail=f"Failed to stop mitigation: {error_message or 'Unknown error'}"

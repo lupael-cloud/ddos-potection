@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     FRR_VTYSH_CMD: str = "/usr/bin/vtysh"  # Path to vtysh command
     
     # BIRD Configuration
+    BIRD_CMD: str = "birdc"  # Path to birdc command
     BIRD_CONTROL_SOCKET: str = "/var/run/bird/bird.ctl"  # BIRD control socket
     
     class Config:
