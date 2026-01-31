@@ -454,52 +454,24 @@ class TrafficCollector:
             print(f"Error publishing to Redis stream: {e}")
     
     def store_traffic(self, flow: Dict[str, Any], isp_id: int = 1):
-        # Publish to Redis stream first for real-time processing
-        self.publish_to_redis_stream(flow)
-        
         db = SessionLocal()
         try:
-            # Extract TCP flags
-            tcp_flags = flow.get('tcp_flags', 0)
-            protocol = flow.get('protocol', 0)
-            src_ip = flow.get('src_ip')
-            packets = flow.get('packets', 0)
-            bytes_count = flow.get('bytes', 0)
-            
-            # Store to database
             traffic_log = TrafficLog(
                 isp_id=isp_id,
-                source_ip=src_ip,
+                source_ip=flow.get('src_ip'),
                 dest_ip=flow.get('dst_ip'),
-                protocol=self.get_protocol_name(protocol),
-                packets=packets,
-                bytes=bytes_count,
+                protocol=self.get_protocol_name(flow.get('protocol', 0)),
+                packets=flow.get('packets', 0),
+                bytes=flow.get('bytes', 0),
                 is_anomaly=False
             )
             db.add(traffic_log)
             db.commit()
             
-            # Redis sliding window counters for traffic analysis
-            current_time = int(datetime.utcnow().timestamp())
-            window_key = f"traffic:window:{isp_id}:{src_ip}"
-            
-            # Add to sorted set with timestamp as score
-            self.redis_client.zadd(window_key, {f"{current_time}:{packets}:{bytes_count}": current_time})
-            # Keep only last 60 seconds
-            self.redis_client.zremrangebyscore(window_key, 0, current_time - 60)
-            self.redis_client.expire(window_key, 120)
-            
-            # Track SYN floods (TCP protocol = 6, SYN flag = 0x02)
-            if protocol == 6 and (tcp_flags & 0x02):
-                syn_key = f"syn_flood:{isp_id}:{src_ip}"
-                self.redis_client.incr(syn_key)
-                self.redis_client.expire(syn_key, 10)
-                
-                # Check for SYN flood threshold
-                syn_count = int(self.redis_client.get(syn_key) or 0)
-                if syn_count > 100:
-                    alert_key = f"alert:syn_flood:{src_ip}"
-                    self.redis_client.setex(alert_key, 60, syn_count)
+            # Update Redis counters for real-time analysis
+            key = f"traffic:{isp_id}:{flow.get('src_ip')}:{flow.get('protocol')}"
+            self.redis_client.incr(key)
+            self.redis_client.expire(key, 60)  # 1 minute TTL
             
         finally:
             db.close()
@@ -517,7 +489,7 @@ class TrafficCollector:
         return protocols.get(protocol_num, f'PROTO_{protocol_num}')
     
     def start_netflow_collector(self, port: int = None):
-        """Start NetFlow collector supporting v5, v9"""
+        """Start NetFlow collector"""
         port = port or settings.NETFLOW_PORT
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         # Bind to all interfaces to receive NetFlow data from routers
@@ -529,99 +501,18 @@ class TrafficCollector:
         while True:
             try:
                 data, addr = sock.recvfrom(65535)
-                
-                # Detect router vendor
-                vendor = self.detect_router_vendor(addr[0], data)
-                
-                # Determine NetFlow version
-                if len(data) >= 2:
-                    version = struct.unpack('!H', data[:2])[0]
-                    
-                    if version == 5:
-                        flows_data = self.parse_netflow_v5(data)
-                    elif version == 9:
-                        flows_data = self.parse_netflow_v9(data, addr[0])
-                    else:
-                        print(f"Unsupported NetFlow version {version} from {addr[0]}")
-                        continue
-                    
-                    for flow in flows_data.get('flows', []):
-                        self.store_traffic(flow)
-                    
-                    if flows_data.get('count', 0) > 0:
-                        print(f"Processed {flows_data['count']} flows from {vendor} router at {addr[0]}")
-                    
-            except Exception as e:
-                print(f"Error processing NetFlow packet from {addr[0]}: {e}")
-                continue
-    
-    def start_sflow_collector(self, port: int = None):
-        """Start sFlow collector"""
-        port = port or settings.SFLOW_PORT
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('0.0.0.0', port))
-        
-        print(f"sFlow collector listening on port {port}")
-        
-        while True:
-            try:
-                data, addr = sock.recvfrom(65535)
-                flows_data = self.parse_sflow(data)
+                flows_data = self.parse_netflow_v5(data)
                 
                 for flow in flows_data.get('flows', []):
                     self.store_traffic(flow)
-                
-                if flows_data.get('count', 0) > 0:
-                    print(f"Processed {flows_data['count']} sFlow samples from {addr[0]}")
                     
             except Exception as e:
-                print(f"Error processing sFlow packet from {addr[0]}: {e}")
+                print(f"Error processing NetFlow packet: {e}")
                 continue
-    
-    def start_ipfix_collector(self, port: int = None):
-        """Start IPFIX collector"""
-        port = port or settings.IPFIX_PORT
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind(('0.0.0.0', port))
-        
-        print(f"IPFIX collector listening on port {port}")
-        
-        while True:
-            try:
-                data, addr = sock.recvfrom(65535)
-                flows_data = self.parse_ipfix(data, addr[0])
-                
-                for flow in flows_data.get('flows', []):
-                    self.store_traffic(flow)
-                
-                if flows_data.get('count', 0) > 0:
-                    print(f"Processed {flows_data['count']} IPFIX records from {addr[0]}")
-                    
-            except Exception as e:
-                print(f"Error processing IPFIX packet from {addr[0]}: {e}")
-                continue
-    
-    def start_all_collectors(self):
-        """Start all collectors in separate threads"""
-        netflow_thread = threading.Thread(target=self.start_netflow_collector, daemon=True)
-        sflow_thread = threading.Thread(target=self.start_sflow_collector, daemon=True)
-        ipfix_thread = threading.Thread(target=self.start_ipfix_collector, daemon=True)
-        
-        netflow_thread.start()
-        sflow_thread.start()
-        ipfix_thread.start()
-        
-        print("All traffic collectors started")
-        print(f"  - NetFlow (v5/v9) on port {settings.NETFLOW_PORT}")
-        print(f"  - sFlow (v5) on port {settings.SFLOW_PORT}")
-        print(f"  - IPFIX on port {settings.IPFIX_PORT}")
-        
-        # Keep main thread alive
-        netflow_thread.join()
 
 def main():
     collector = TrafficCollector()
-    collector.start_all_collectors()
+    collector.start_netflow_collector()
 
 if __name__ == "__main__":
     main()
