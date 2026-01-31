@@ -137,7 +137,7 @@ class MitigationService:
                 '-c', f'ip route {prefix} Null0 tag 666'
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 print(f"BGP blackhole announced via FRR: {prefix}")
                 return True
@@ -151,12 +151,13 @@ class MitigationService:
     def _announce_bird(self, prefix: str, nexthop: str) -> bool:
         """Announce via BIRD"""
         try:
-            # For BIRD, we add route to static blackhole protocol
-            # This requires BIRD configuration with blackhole_routes protocol
-            cmd = ['birdc', 'configure']
+            # For BIRD, we need to add route dynamically using birdc
+            # Note: This requires BIRD configuration to allow dynamic routes
+            # via the blackhole_routes protocol
+            cmd = ['birdc', '-r', f'add route {prefix} blackhole']
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 or 'already exists' in result.stdout.lower():
                 print(f"BGP blackhole announced via BIRD: {prefix}")
                 return True
             else:
@@ -213,7 +214,7 @@ class MitigationService:
                 '-c', f'no ip route {prefix} Null0 tag 666'
             ]
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode == 0:
                 print(f"BGP blackhole withdrawn via FRR: {prefix}")
                 return True
@@ -227,11 +228,11 @@ class MitigationService:
     def _withdraw_bird(self, prefix: str) -> bool:
         """Withdraw via BIRD"""
         try:
-            # Reload BIRD configuration
-            cmd = ['birdc', 'configure']
+            # Remove the route dynamically using birdc
+            cmd = ['birdc', '-r', f'delete route {prefix}']
             
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            if result.returncode == 0:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 or 'not found' in result.stdout.lower():
                 print(f"BGP blackhole withdrawn via BIRD: {prefix}")
                 return True
             else:

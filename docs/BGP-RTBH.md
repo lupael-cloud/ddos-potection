@@ -949,5 +949,5 @@ def validate_prefix_ownership(prefix: str, isp_id: int) -> bool:
 For help with BGP blackholing:
 - Check logs: `sudo journalctl -u exabgp -f`
 - Platform logs: `docker-compose logs -f backend`
-- GitHub Issues: [https://github.com/i4edubd/ddos-potection/issues](https://github.com/i4edubd/ddos-potection/issues)
+- GitHub Issues: [https://github.com/i4edubd/ddos-protection/issues](https://github.com/i4edubd/ddos-protection/issues)
 - Contact your ISP's NOC for BGP-specific issues

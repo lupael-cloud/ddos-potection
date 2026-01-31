@@ -191,7 +191,7 @@ async def stop_mitigation(
     except Exception as e:
         error_message = str(e)
     
-    if success or mitigation.status == "failed":
+    if success:
         mitigation.status = "completed"
         mitigation.completed_at = datetime.utcnow()
         db.commit()

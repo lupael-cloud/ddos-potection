@@ -152,8 +152,8 @@ def main():
                        help="Action to perform")
     parser.add_argument("--username", default="admin",
                        help="API username (default: admin)")
-    parser.add_argument("--password", default="password",
-                       help="API password")
+    parser.add_argument("--password", required=True,
+                       help="API password (required)")
     parser.add_argument("--api-url", default=API_BASE_URL,
                        help=f"API base URL (default: {API_BASE_URL})")
     parser.add_argument("--alert-id", type=int, default=1,
