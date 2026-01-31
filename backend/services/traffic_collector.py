@@ -92,6 +92,8 @@ class TrafficCollector:
         """Start NetFlow collector"""
         port = port or settings.NETFLOW_PORT
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Bind to all interfaces to receive NetFlow data from routers
+        # This is intentional and secured by Docker network isolation
         sock.bind(('0.0.0.0', port))
         
         print(f"NetFlow collector listening on port {port}")
