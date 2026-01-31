@@ -46,15 +46,21 @@ Open your browser and navigate to:
 
 ## Step 4: Create Your Account
 
-1. Click "Register" or fill the registration form
-2. Enter your details:
-   - Username: `admin`
-   - Email: `admin@yourisp.com`
-   - Password: `ChangeThisPassword123!`
-   - ISP Name: `Your ISP Name`
-3. Click "Register"
+Register via API:
 
-You'll be automatically logged in!
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "email": "admin@yourisp.com",
+    "password": "YourSecurePassword123!",
+    "isp_name": "Your ISP Name",
+    "role": "admin"
+  }'
+```
+
+Then login at http://localhost:3000 with your credentials.
 
 ## Step 5: Explore the Dashboard
 

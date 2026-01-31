@@ -4,9 +4,6 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000/api
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
 });
 
 // Add token to requests
@@ -26,12 +23,20 @@ api.interceptors.request.use(
 // Auth endpoints
 export const authService = {
   login: (username, password) => {
-    const formData = new FormData();
+    const formData = new URLSearchParams();
     formData.append('username', username);
     formData.append('password', password);
-    return api.post('/auth/token', formData);
+    return api.post('/auth/token', formData, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    });
   },
-  register: (data) => api.post('/auth/register', data),
+  register: (data) => api.post('/auth/register', data, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  }),
   getCurrentUser: () => api.get('/auth/me'),
 };
 

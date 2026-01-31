@@ -3,10 +3,8 @@ Traffic collector service for NetFlow/sFlow/IPFIX
 """
 import socket
 import struct
-from datetime import datetime
 from typing import Dict, Any
 import redis
-from sqlalchemy.orm import Session
 
 from database import SessionLocal
 from models.models import TrafficLog
@@ -53,7 +51,12 @@ class TrafficCollector:
         return {'protocol': 'sflow', 'data': 'parsed'}
     
     def store_traffic(self, flow: Dict[str, Any], isp_id: int = 1):
-        """Store traffic data in database"""
+        """
+        Store traffic data in database
+        
+        Note: In production, isp_id should be determined from router source IP
+        or a configuration mapping. Current default is for single-tenant testing.
+        """
         db = SessionLocal()
         try:
             traffic_log = TrafficLog(
@@ -69,7 +72,7 @@ class TrafficCollector:
             db.commit()
             
             # Update Redis counters for real-time analysis
-            key = f"traffic:{flow.get('src_ip')}:{flow.get('protocol')}"
+            key = f"traffic:{isp_id}:{flow.get('src_ip')}:{flow.get('protocol')}"
             self.redis_client.incr(key)
             self.redis_client.expire(key, 60)  # 1 minute TTL
             

@@ -101,7 +101,6 @@ async def execute_mitigation(
         pass
     
     mitigation.status = "active"
-    mitigation.completed_at = datetime.utcnow()
     db.commit()
     
     return {"message": "Mitigation executed successfully", "status": "active"}

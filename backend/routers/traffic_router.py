@@ -1,8 +1,7 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from typing import List
 from pydantic import BaseModel
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from database import get_db
 from models.models import TrafficLog

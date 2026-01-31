@@ -31,7 +31,7 @@ metadata:
   namespace: ddos-platform
 type: Opaque
 stringData:
-  DATABASE_URL: "postgresql://ddos_user:CHANGE_THIS_PASSWORD@postgres:5432/ddos_platform"
+  DATABASE_URL: "postgresql://ddos_user:ddos_pass@postgres:5432/ddos_platform"
   SECRET_KEY: "CHANGE-THIS-SECRET-KEY-IN-PRODUCTION"
   SMTP_PASSWORD: "your-smtp-password"
   TELEGRAM_BOT_TOKEN: "your-telegram-token"
@@ -225,7 +225,7 @@ spec:
           name: http
         env:
         - name: REACT_APP_API_URL
-          value: "http://backend:8000/api/v1"
+          value: "/api/v1"
         resources:
           requests:
             memory: "128Mi"

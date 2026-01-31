@@ -206,12 +206,30 @@ docker-compose logs -f
 # Run database migrations (if using Alembic)
 docker-compose exec backend alembic upgrade head
 
-# Create first admin user (optional, can also do via web UI)
+# Create first admin user via API
+# IMPORTANT: Use a strong, unique password - NOT the example shown here!
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "email": "admin@yourdomain.com",
+    "password": "USE-A-STRONG-UNIQUE-PASSWORD-HERE",
+    "isp_name": "Admin ISP",
+    "role": "admin"
+  }'
+
+# Alternative: Create via Python script with environment variable
 docker-compose exec backend python -c "
+import os
 from database import SessionLocal
 from models.models import User, ISP
 from routers.auth_router import get_password_hash
 import secrets
+
+# Get password from environment variable (set this before running!)
+admin_password = os.environ.get('ADMIN_PASSWORD')
+if not admin_password:
+    raise ValueError('ADMIN_PASSWORD environment variable must be set')
 
 db = SessionLocal()
 isp = ISP(name='Admin ISP', email='admin@yourdomain.com', api_key=secrets.token_urlsafe(32))
@@ -221,7 +239,7 @@ db.commit()
 user = User(
     username='admin',
     email='admin@yourdomain.com',
-    hashed_password=get_password_hash('ChangeThisPassword123!'),
+    hashed_password=get_password_hash(admin_password),
     role='admin',
     isp_id=isp.id
 )

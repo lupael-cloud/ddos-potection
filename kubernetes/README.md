@@ -24,15 +24,16 @@ kubectl get svc -n ddos-platform
 
 ## Components
 
-- **namespace.yaml**: Creates ddos-platform namespace
-- **postgres.yaml**: PostgreSQL StatefulSet with PVC
-- **redis.yaml**: Redis Deployment
-- **backend.yaml**: Backend API Deployment
-- **frontend.yaml**: Frontend Deployment
-- **services.yaml**: Service definitions
-- **ingress.yaml**: Ingress for external access
-- **configmap.yaml**: Configuration data
-- **secrets.yaml**: Sensitive data (update before deploying!)
+The `deployment.yaml` file contains all Kubernetes resources:
+- Namespace (ddos-platform)
+- ConfigMap (backend-config)
+- Secret (backend-secrets) - **Update passwords before deploying!**
+- PostgreSQL StatefulSet with PVC
+- Redis Deployment
+- Backend API Deployment
+- Frontend Deployment
+- Services (postgres, redis, backend, frontend)
+- Ingress for external access
 
 ## Scaling
 
@@ -88,4 +89,4 @@ kubectl delete namespace ddos-platform
 7. Configure network policies
 8. Use separate namespaces for dev/staging/prod
 
-For detailed Helm chart deployment, see `helm/` directory.
+Note: Helm charts are not yet available but planned for future releases.

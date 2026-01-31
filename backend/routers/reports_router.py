@@ -68,9 +68,12 @@ async def generate_report(
         TrafficLog.timestamp >= start_date
     ).first()
     
-    # Generate PDF report (simplified)
+    # Generate report file
+    # Note: In production, use persistent storage (PVC/S3) instead of /tmp
+    # For Kubernetes: mount a PVC to /app/reports
+    # For cloud: use S3/GCS/Azure Blob storage
     import os
-    report_dir = "/tmp/reports"
+    report_dir = os.environ.get('REPORTS_DIR', '/tmp/reports')
     os.makedirs(report_dir, exist_ok=True)
     
     filename = f"report_{current_user.isp_id}_{report_type}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"

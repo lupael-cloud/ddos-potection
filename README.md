@@ -109,7 +109,21 @@ This will start:
 
 ### 5. Create Your First Account
 
-Navigate to http://localhost:3000 and register a new account. The first user will be created as an admin.
+Use the API to register:
+
+```bash
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "admin",
+    "email": "admin@yourisp.com",
+    "password": "YourSecurePassword123!",
+    "isp_name": "Your ISP Name",
+    "role": "admin"
+  }'
+```
+
+Then login at http://localhost:3000 with your credentials.
 
 ## 🔧 Router Integration
 
@@ -264,10 +278,11 @@ npm test
 
 ## 📖 Documentation
 
+- [Quick Start Guide](QUICKSTART.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
-- [API Reference](docs/API.md)
-- [Router Integration](docs/ROUTER_INTEGRATION.md)
 - [Development Guide](docs/DEVELOPMENT.md)
+- [Security Documentation](SECURITY.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
 
 ## 🤝 Contributing
 

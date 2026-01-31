@@ -2,12 +2,10 @@
 Mitigation automation service
 """
 import subprocess
-from typing import Dict, Any
-import requests
 from datetime import datetime
 
 from database import SessionLocal
-from models.models import MitigationAction, Alert, Rule
+from models.models import MitigationAction, Alert
 from config import settings
 
 class MitigationService:
@@ -18,21 +16,25 @@ class MitigationService:
         """Apply iptables firewall rule"""
         try:
             if action == "block":
-                cmd = ["iptables", "-A", "INPUT", "-s", ip, "-j", "DROP"]
+                cmd = ["iptables", "-A", "INPUT"]
                 if protocol:
-                    cmd.insert(4, "-p")
-                    cmd.insert(5, protocol.lower())
+                    cmd.extend(["-p", protocol.lower()])
+                cmd.extend(["-s", ip, "-j", "DROP"])
                 
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 return result.returncode == 0
             
             elif action == "unblock":
-                cmd = ["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"]
+                cmd = ["iptables", "-D", "INPUT"]
+                if protocol:
+                    cmd.extend(["-p", protocol.lower()])
+                cmd.extend(["-s", ip, "-j", "DROP"])
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 return result.returncode == 0
                 
         except Exception as e:
             print(f"Error applying iptables rule: {e}")
+            return False
             return False
     
     def apply_nftables_rule(self, action: str, ip: str) -> bool:
@@ -188,7 +190,7 @@ class MitigationService:
             db.close()
 
 def main():
-    service = MitigationService()
+    MitigationService()
     print("Mitigation service initialized")
 
 if __name__ == "__main__":

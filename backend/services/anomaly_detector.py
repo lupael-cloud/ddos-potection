@@ -4,7 +4,7 @@ Anomaly detection engine for DDoS attacks
 import redis
 import time
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import List
 from collections import defaultdict
 import math
 
@@ -21,33 +21,39 @@ class AnomalyDetector:
         )
     
     def detect_syn_flood(self, isp_id: int = 1) -> bool:
-        """Detect SYN flood attacks"""
+        """
+        Detect SYN flood attacks
+        
+        Note: Current implementation relies on TCP flags in TrafficLog.
+        The NetFlow v5 parser needs to be updated to extract and store TCP flags.
+        As a fallback, detection uses high TCP packet rates to dest IPs.
+        """
         db = SessionLocal()
         try:
             # Check TCP traffic in last minute
             one_min_ago = datetime.utcnow() - timedelta(minutes=1)
             
-            tcp_packets = db.query(TrafficLog).filter(
+            from sqlalchemy import func
+            
+            # Count TCP packets per destination IP (fallback detection method)
+            tcp_stats = db.query(
+                TrafficLog.dest_ip,
+                func.sum(TrafficLog.packets).label('total_packets')
+            ).filter(
                 TrafficLog.isp_id == isp_id,
                 TrafficLog.protocol == 'TCP',
                 TrafficLog.timestamp >= one_min_ago
-            ).all()
-            
-            # Count SYN packets per destination
-            syn_counts = defaultdict(int)
-            for log in tcp_packets:
-                if log.flags and 'S' in log.flags:
-                    syn_counts[log.dest_ip] += log.packets
+            ).group_by(TrafficLog.dest_ip).all()
             
             # Check threshold
-            for dest_ip, count in syn_counts.items():
-                if count > settings.SYN_FLOOD_THRESHOLD:
+            for stat in tcp_stats:
+                if stat.total_packets > settings.SYN_FLOOD_THRESHOLD:
                     self.create_alert(
                         isp_id=isp_id,
                         alert_type='syn_flood',
                         severity='high',
-                        target_ip=dest_ip,
-                        description=f'SYN flood detected: {count} SYN packets/min to {dest_ip}'
+                        target_ip=stat.dest_ip,
+                        description=f'Possible SYN flood: {stat.total_packets} TCP packets/min to {stat.dest_ip}'
                     )
                     return True
             

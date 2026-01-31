@@ -25,7 +25,7 @@ function Settings() {
   const handleRegenerateApiKey = async () => {
     if (window.confirm('Are you sure you want to regenerate the API key? This will invalidate the current key.')) {
       try {
-        const response = await ispService.regenerateApiKey();
+        await ispService.regenerateApiKey();
         alert('API key regenerated successfully');
         loadSettings();
       } catch (error) {

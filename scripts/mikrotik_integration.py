@@ -2,14 +2,24 @@
 """
 MikroTik Router Integration Script
 Configures NetFlow export on MikroTik routers
+
+Requirements:
+    pip install routeros-api
 """
 
 import sys
-from routeros_api import RouterOsApiPool
 
 def configure_netflow(router_ip, username, password, collector_ip, collector_port=2055):
     """Configure NetFlow on MikroTik router"""
     try:
+        # Import here to provide clear error message
+        try:
+            from routeros_api import RouterOsApiPool
+        except ImportError:
+            print("Error: routeros-api library not installed")
+            print("Please install it with: pip install routeros-api")
+            return False
+        
         # Connect to router
         connection = RouterOsApiPool(
             router_ip,

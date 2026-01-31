@@ -14,6 +14,8 @@ function Rules() {
     action: 'block',
     priority: 100,
   });
+  const [conditionText, setConditionText] = useState('{}');
+  const [conditionError, setConditionError] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -32,8 +34,13 @@ function Rules() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate JSON before submitting
     try {
-      await rulesService.create(formData);
+      const parsedCondition = JSON.parse(conditionText);
+      const dataToSubmit = { ...formData, condition: parsedCondition };
+      
+      await rulesService.create(dataToSubmit);
       setShowForm(false);
       setFormData({
         name: '',
@@ -42,10 +49,17 @@ function Rules() {
         action: 'block',
         priority: 100,
       });
+      setConditionText('{}');
+      setConditionError('');
       loadRules();
     } catch (error) {
-      console.error('Error creating rule:', error);
-      alert('Error creating rule');
+      if (error instanceof SyntaxError) {
+        setConditionError('Invalid JSON format');
+      } else {
+        console.error('Error creating rule:', error);
+        alert('Error creating rule');
+      }
+    }
     }
   };
 
@@ -124,14 +138,18 @@ function Rules() {
                 <label>Condition (JSON)</label>
                 <textarea
                   rows="4"
-                  value={JSON.stringify(formData.condition)}
+                  value={conditionText}
                   onChange={(e) => {
-                    try {
-                      setFormData({ ...formData, condition: JSON.parse(e.target.value) });
-                    } catch {}
+                    setConditionText(e.target.value);
+                    setConditionError('');
                   }}
                   placeholder='{"ip": "1.2.3.4", "port": 80}'
                 />
+                {conditionError && (
+                  <div style={{ color: 'red', marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                    {conditionError}
+                  </div>
+                )}
               </div>
               <button type="submit" className="btn btn-primary">Create Rule</button>
             </form>
