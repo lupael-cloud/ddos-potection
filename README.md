@@ -281,6 +281,7 @@ npm test
 - [Quick Start Guide](QUICKSTART.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
 - [Development Guide](docs/DEVELOPMENT.md)
+- [BGP Blackholing (RTBH) Guide](docs/BGP-RTBH.md) - Setup and use BGP-based DDoS mitigation
 - [Security Documentation](SECURITY.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 

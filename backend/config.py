@@ -55,6 +55,21 @@ class Settings(BaseSettings):
     # Monitoring
     PROMETHEUS_PORT: int = 9090
     
+    # BGP Blackholing (RTBH) Configuration
+    BGP_ENABLED: bool = False  # Set to True to enable BGP blackholing
+    BGP_DAEMON: str = "exabgp"  # Options: exabgp, frr, bird
+    BGP_BLACKHOLE_NEXTHOP: str = "192.0.2.1"  # Standard blackhole next-hop
+    BGP_BLACKHOLE_COMMUNITY: str = "65535:666"  # RFC 7999 blackhole community
+    
+    # ExaBGP Configuration
+    EXABGP_CMD_PIPE: str = "/var/run/exabgp.cmd"  # Named pipe for ExaBGP commands
+    
+    # FRR Configuration
+    FRR_VTYSH_CMD: str = "/usr/bin/vtysh"  # Path to vtysh command
+    
+    # BIRD Configuration
+    BIRD_CONTROL_SOCKET: str = "/var/run/bird/bird.ctl"  # BIRD control socket
+    
     class Config:
         env_file = ".env"
 
