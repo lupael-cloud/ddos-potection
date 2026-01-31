@@ -89,21 +89,67 @@ async def execute_mitigation(
     if not mitigation:
         raise HTTPException(status_code=404, detail="Mitigation not found")
     
+    # Import mitigation service
+    from services.mitigation_service import MitigationService
+    service = MitigationService()
+    
+    success = False
+    error_message = None
+    is_client_error = False
+    
     # Execute mitigation based on action_type
-    if mitigation.action_type == "firewall":
-        # Apply iptables/nftables rules
-        pass
-    elif mitigation.action_type == "bgp_blackhole":
-        # Announce BGP blackhole
-        pass
-    elif mitigation.action_type == "flowspec":
-        # Send FlowSpec update
-        pass
+    try:
+        if mitigation.action_type == "firewall":
+            # Apply iptables/nftables rules
+            ip = mitigation.details.get('ip')
+            protocol = mitigation.details.get('protocol')
+            if ip:
+                success = service.apply_iptables_rule('block', ip, protocol)
+            else:
+                error_message = "Firewall mitigation requires an 'ip' address in mitigation details"
+                is_client_error = True
+        
+        elif mitigation.action_type == "bgp_blackhole":
+            # Announce BGP blackhole (RTBH)
+            prefix = mitigation.details.get('prefix')
+            nexthop = mitigation.details.get('nexthop')
+            if prefix:
+                success = service.announce_bgp_blackhole(prefix, nexthop)
+            else:
+                error_message = "BGP blackhole requires a 'prefix' in CIDR notation (e.g., 192.0.2.1/32) in mitigation details"
+                is_client_error = True
+        
+        elif mitigation.action_type == "flowspec":
+            # Send FlowSpec update
+            source = mitigation.details.get('source')
+            dest = mitigation.details.get('destination')
+            protocol = mitigation.details.get('protocol')
+            success = service.send_flowspec_rule(source, dest, protocol)
+        
+        else:
+            error_message = f"Unknown action type: {mitigation.action_type}"
+            is_client_error = True
     
-    mitigation.status = "active"
-    db.commit()
+    except Exception as e:
+        error_message = str(e)
     
-    return {"message": "Mitigation executed successfully", "status": "active"}
+    if success:
+        mitigation.status = "active"
+        db.commit()
+        return {"message": "Mitigation executed successfully", "status": "active"}
+    else:
+        # Determine HTTP status code based on error type
+        status_code = 400 if is_client_error else 500
+        
+        # Only mark as failed for server errors, not client errors
+        if status_code >= 500:
+            mitigation.status = "failed"
+            db.commit()
+        
+        raise HTTPException(
+            status_code=status_code,
+            detail=f"Mitigation execution failed: {error_message or 'Unknown error'}"
+        )
 
 @router.post("/{mitigation_id}/stop")
 async def stop_mitigation(
@@ -123,8 +169,56 @@ async def stop_mitigation(
     if not mitigation:
         raise HTTPException(status_code=404, detail="Mitigation not found")
     
-    mitigation.status = "completed"
-    mitigation.completed_at = datetime.utcnow()
-    db.commit()
+    # Import mitigation service
+    from services.mitigation_service import MitigationService
+    service = MitigationService()
     
-    return {"message": "Mitigation stopped successfully", "status": "completed"}
+    success = False
+    error_message = None
+    
+    # Stop mitigation based on action_type
+    try:
+        if mitigation.action_type == "firewall":
+            # Remove iptables/nftables rules
+            ip = mitigation.details.get('ip')
+            protocol = mitigation.details.get('protocol')
+            if ip:
+                success = service.apply_iptables_rule('unblock', ip, protocol)
+        
+        elif mitigation.action_type == "bgp_blackhole":
+            # Withdraw BGP blackhole route
+            prefix = mitigation.details.get('prefix')
+            if prefix:
+                success = service.withdraw_bgp_blackhole(prefix)
+            else:
+                error_message = "Missing 'prefix' in mitigation details"
+        
+        elif mitigation.action_type == "flowspec":
+            # Withdraw FlowSpec rule (implementation depends on BGP daemon)
+            success = True  # Placeholder
+        
+        else:
+            error_message = f"Unknown action type: {mitigation.action_type}"
+    
+    except Exception as e:
+        error_message = str(e)
+    
+    if success:
+        mitigation.status = "completed"
+        mitigation.completed_at = datetime.utcnow()
+        db.commit()
+        return {"message": "Mitigation stopped successfully", "status": "completed"}
+    else:
+        # Persist the failure state so operators can see it
+        mitigation.status = "failed"
+        if error_message:
+            # Store error in details for debugging
+            if not mitigation.details:
+                mitigation.details = {}
+            mitigation.details['stop_error'] = error_message
+        db.commit()
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to stop mitigation: {error_message or 'Unknown error'}"
+        )

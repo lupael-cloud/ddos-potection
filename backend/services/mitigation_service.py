@@ -2,11 +2,30 @@
 Mitigation automation service
 """
 import subprocess
+import ipaddress
+import os
+import errno
 from datetime import datetime
 
 from database import SessionLocal
 from models.models import MitigationAction, Alert
 from config import settings
+
+def validate_prefix(prefix: str) -> bool:
+    """Validate that prefix is a valid IPv4 or IPv6 CIDR notation
+    
+    Args:
+        prefix: IP prefix in CIDR notation (e.g., "192.0.2.1/32" or "2001:db8::1/128")
+    
+    Returns:
+        True if valid, False otherwise
+    """
+    try:
+        # Use ipaddress module for proper validation
+        ipaddress.ip_network(prefix, strict=False)
+        return True
+    except (ValueError, AttributeError):
+        return False
 
 class MitigationService:
     def __init__(self):
@@ -85,20 +104,258 @@ class MitigationService:
             print(f"Error blocking IP on MikroTik: {e}")
             return False
     
-    def announce_bgp_blackhole(self, prefix: str, nexthop: str = "192.0.2.1") -> bool:
-        """Announce BGP blackhole route (RTBH)"""
+    def announce_bgp_blackhole(self, prefix: str, nexthop: str = None) -> bool:
+        """Announce BGP blackhole route (RTBH)
+        
+        Supports multiple BGP daemons: ExaBGP, FRR, BIRD
+        See docs/BGP-RTBH.md for setup instructions
+        """
         try:
-            # This would integrate with BGP daemon (BIRD, FRR, Quagga)
-            # Example using ExaBGP or direct BGP API
+            # Check if BGP is enabled
+            bgp_enabled = getattr(settings, 'BGP_ENABLED', False)
+            if not bgp_enabled:
+                print("BGP blackholing is disabled. Set BGP_ENABLED=true in configuration.")
+                return False
             
-            # Simplified: write to ExaBGP command file
-            with open('/var/run/exabgp.cmd', 'a') as f:
-                f.write(f'announce route {prefix} next-hop {nexthop} community [65535:666]\n')
+            # Use configured BGP daemon or default to ExaBGP
+            bgp_daemon = getattr(settings, 'BGP_DAEMON', 'exabgp')
+            nexthop = nexthop or getattr(settings, 'BGP_BLACKHOLE_NEXTHOP', '192.0.2.1')
             
-            return True
-            
+            if bgp_daemon == 'exabgp':
+                return self._announce_exabgp(prefix, nexthop)
+            elif bgp_daemon == 'frr':
+                return self._announce_frr(prefix, nexthop)
+            elif bgp_daemon == 'bird':
+                return self._announce_bird(prefix, nexthop)
+            else:
+                print(f"Unknown BGP daemon: {bgp_daemon}")
+                return False
+                
         except Exception as e:
             print(f"Error announcing BGP blackhole: {e}")
+            return False
+    
+    def _announce_exabgp(self, prefix: str, nexthop: str) -> bool:
+        """Announce via ExaBGP"""
+        try:
+            # Validate prefix and nexthop to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"ExaBGP error: Invalid prefix format: {prefix}")
+                return False
+            
+            # Validate nexthop is a valid IP address
+            try:
+                ipaddress.ip_address(nexthop)
+            except ValueError:
+                print(f"ExaBGP error: Invalid nexthop format: {nexthop}")
+                return False
+            
+            cmd_pipe = getattr(settings, 'EXABGP_CMD_PIPE', '/var/run/exabgp.cmd')
+            community = getattr(settings, 'BGP_BLACKHOLE_COMMUNITY', '65535:666')
+            
+            # Use non-blocking open to avoid hanging if ExaBGP is not running
+            try:
+                fd = os.open(cmd_pipe, os.O_WRONLY | os.O_NONBLOCK)
+                try:
+                    # Write validated command to ExaBGP pipe
+                    command = f'announce route {prefix} next-hop {nexthop} community [{community}]\n'
+                    os.write(fd, command.encode())
+                    print(f"BGP blackhole announced via ExaBGP: {prefix} -> {nexthop}")
+                    return True
+                finally:
+                    os.close(fd)
+            except OSError as e:
+                if e.errno == errno.ENXIO:
+                    print(f"ExaBGP error: No reader on pipe (ExaBGP not running?)")
+                else:
+                    print(f"ExaBGP error: Failed to write to pipe: {e}")
+                return False
+            
+        except Exception as e:
+            print(f"ExaBGP error: {e}")
+            return False
+    
+    def _announce_frr(self, prefix: str, nexthop: str) -> bool:
+        """Announce via FRR (Free Range Routing)
+        
+        Note: FRR uses route-maps to set the next-hop, so the nexthop parameter
+        is not directly used. Configure next-hop in FRR's route-map instead.
+        """
+        try:
+            # Validate prefix to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"FRR error: Invalid prefix format: {prefix}")
+                return False
+            
+            vtysh_cmd = getattr(settings, 'FRR_VTYSH_CMD', '/usr/bin/vtysh')
+            
+            # Add static route with tag 666 (matches route-map for RTBH)
+            cmd = [
+                vtysh_cmd,
+                '-c', 'configure terminal',
+                '-c', f'ip route {prefix} Null0 tag 666'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print(f"BGP blackhole announced via FRR: {prefix}")
+                return True
+            else:
+                print(f"FRR error: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"FRR error: {e}")
+            return False
+    
+    def _announce_bird(self, prefix: str, nexthop: str) -> bool:
+        """Announce via BIRD
+        
+        Note: BIRD configures next-hop and communities via BGP protocol config,
+        so the nexthop parameter is not directly used. Configure in BIRD config instead.
+        """
+        try:
+            # Validate prefix to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"BIRD error: Invalid prefix format: {prefix}")
+                return False
+            
+            # Get BIRD configuration
+            birdc_cmd = getattr(settings, 'BIRD_CMD', 'birdc')
+            birdc_socket = getattr(settings, 'BIRD_CONTROL_SOCKET', None)
+            
+            # For BIRD, we need to add route dynamically using birdc
+            # Note: This requires BIRD configuration to allow dynamic routes
+            # via the blackhole_routes protocol
+            # Using list form prevents shell injection
+            cmd = [birdc_cmd]
+            if birdc_socket:
+                cmd.extend(['-s', birdc_socket])
+            cmd.extend(['-r', 'add', 'route', prefix, 'blackhole'])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 or 'already exists' in result.stdout.lower():
+                print(f"BGP blackhole announced via BIRD: {prefix}")
+                return True
+            else:
+                print(f"BIRD error: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"BIRD error: {e}")
+            return False
+    
+    def withdraw_bgp_blackhole(self, prefix: str) -> bool:
+        """Withdraw BGP blackhole route
+        
+        Removes previously announced blackhole route
+        See docs/BGP-RTBH.md for details
+        """
+        try:
+            bgp_daemon = getattr(settings, 'BGP_DAEMON', 'exabgp')
+            
+            if bgp_daemon == 'exabgp':
+                return self._withdraw_exabgp(prefix)
+            elif bgp_daemon == 'frr':
+                return self._withdraw_frr(prefix)
+            elif bgp_daemon == 'bird':
+                return self._withdraw_bird(prefix)
+            else:
+                return False
+                
+        except Exception as e:
+            print(f"Error withdrawing BGP blackhole: {e}")
+            return False
+    
+    def _withdraw_exabgp(self, prefix: str) -> bool:
+        """Withdraw via ExaBGP"""
+        try:
+            # Validate prefix to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"ExaBGP error: Invalid prefix format: {prefix}")
+                return False
+            
+            # Check for control characters
+            if any(ord(ch) < 32 for ch in prefix):
+                print(f"ExaBGP error: Prefix contains control characters: {prefix!r}")
+                return False
+            
+            cmd_pipe = getattr(settings, 'EXABGP_CMD_PIPE', '/var/run/exabgp.cmd')
+            
+            # Use non-blocking open to avoid hanging if ExaBGP is not running
+            try:
+                fd = os.open(cmd_pipe, os.O_WRONLY | os.O_NONBLOCK)
+                try:
+                    command = f'withdraw route {prefix}\n'
+                    os.write(fd, command.encode())
+                    print(f"BGP blackhole withdrawn via ExaBGP: {prefix}")
+                    return True
+                finally:
+                    os.close(fd)
+            except OSError as e:
+                if e.errno == errno.ENXIO:
+                    print(f"ExaBGP error: No reader on pipe (ExaBGP not running?)")
+                else:
+                    print(f"ExaBGP error: Failed to write to pipe: {e}")
+                return False
+                
+        except Exception as e:
+            print(f"ExaBGP withdrawal error: {e}")
+            return False
+    
+    def _withdraw_frr(self, prefix: str) -> bool:
+        """Withdraw via FRR"""
+        try:
+            # Validate prefix to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"FRR error: Invalid prefix format: {prefix}")
+                return False
+            
+            vtysh_cmd = getattr(settings, 'FRR_VTYSH_CMD', '/usr/bin/vtysh')
+            
+            cmd = [
+                vtysh_cmd,
+                '-c', 'configure terminal',
+                '-c', f'no ip route {prefix} Null0 tag 666'
+            ]
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                print(f"BGP blackhole withdrawn via FRR: {prefix}")
+                return True
+            else:
+                print(f"FRR withdrawal error: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"FRR withdrawal error: {e}")
+            return False
+    
+    def _withdraw_bird(self, prefix: str) -> bool:
+        """Withdraw via BIRD"""
+        try:
+            # Validate prefix to prevent command injection
+            if not validate_prefix(prefix):
+                print(f"BIRD error: Invalid prefix format: {prefix}")
+                return False
+            
+            # Get BIRD configuration
+            birdc_cmd = getattr(settings, 'BIRD_CMD', 'birdc')
+            birdc_socket = getattr(settings, 'BIRD_CONTROL_SOCKET', None)
+            
+            # Remove the route dynamically using birdc
+            # Using list form prevents shell injection
+            cmd = [birdc_cmd]
+            if birdc_socket:
+                cmd.extend(['-s', birdc_socket])
+            cmd.extend(['-r', 'delete', 'route', prefix])
+            
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 or 'not found' in result.stdout.lower():
+                print(f"BGP blackhole withdrawn via BIRD: {prefix}")
+                return True
+            else:
+                print(f"BIRD withdrawal error: {result.stderr}")
+                return False
+        except Exception as e:
+            print(f"BIRD withdrawal error: {e}")
             return False
     
     def send_flowspec_rule(self, source: str = None, dest: str = None, 
