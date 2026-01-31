@@ -3,7 +3,7 @@ Traffic collector service for NetFlow/sFlow/IPFIX
 """
 import socket
 import struct
-from typing import Dict, Any, List, Tuple
+from typing import Dict, Any, List
 import redis
 import json
 import threading
@@ -220,7 +220,8 @@ class TrafficCollector:
             
             # Raw packet header (type 1)
             if record_type == 1 and len(record_data) >= 16:
-                protocol = struct.unpack('!I', record_data[:4])[0]
+                # Skip protocol field (not used for parsing)
+                _ = struct.unpack('!I', record_data[:4])[0]
                 frame_length = struct.unpack('!I', record_data[4:8])[0]
                 header_length = struct.unpack('!I', record_data[12:16])[0]
                 
@@ -416,12 +417,14 @@ class TrafficCollector:
             # MikroTik typically uses NetFlow v9
             if version == 9:
                 vendor = 'mikrotik'
-            # Cisco commonly uses NetFlow v5 or v9
+            # NetFlow v5 - differentiate by packet characteristics
             elif version == 5:
-                vendor = 'cisco'
-            # Juniper often uses sFlow or IPFIX
-            elif version == 5 and len(data) > 28:
-                vendor = 'juniper'
+                # Heuristic: longer NetFlow v5 packets may indicate Juniper
+                if len(data) > 100:
+                    vendor = 'juniper'
+                else:
+                    # Cisco commonly uses NetFlow v5
+                    vendor = 'cisco'
             # IPFIX
             elif version == 10:
                 vendor = 'cisco'  # or other IPFIX-capable vendor
@@ -454,38 +457,52 @@ class TrafficCollector:
             print(f"Error publishing to Redis stream: {e}")
     
     def store_traffic(self, flow: Dict[str, Any], isp_id: int = 1):
+        """
+        Store traffic data in database and Redis
+        
+        Note: In production, isp_id should be determined from router source IP
+        or a configuration mapping. Current default is for single-tenant testing.
+        """
         # Publish to Redis stream first for real-time processing
         self.publish_to_redis_stream(flow)
         
         db = SessionLocal()
         try:
-            # Extract TCP flags
+            # Extract flow data
             tcp_flags = flow.get('tcp_flags', 0)
             protocol = flow.get('protocol', 0)
-            src_ip = flow.get('src_ip')
+            src_ip = flow.get('src_ip', 'unknown')
+            dst_ip = flow.get('dst_ip', 'unknown')
             packets = flow.get('packets', 0)
             bytes_count = flow.get('bytes', 0)
+            
+            # Extract TCP flags string for database storage
+            tcp_flags_str = ''
+            if tcp_flags:
+                flags = []
+                if tcp_flags & 0x01: flags.append('FIN')
+                if tcp_flags & 0x02: flags.append('SYN')
+                if tcp_flags & 0x04: flags.append('RST')
+                if tcp_flags & 0x08: flags.append('PSH')
+                if tcp_flags & 0x10: flags.append('ACK')
+                if tcp_flags & 0x20: flags.append('URG')
+                tcp_flags_str = ','.join(flags)
             
             # Store to database
             traffic_log = TrafficLog(
                 isp_id=isp_id,
                 source_ip=src_ip,
-                dest_ip=flow.get('dst_ip'),
+                dest_ip=dst_ip,
                 protocol=self.get_protocol_name(protocol),
                 packets=packets,
                 bytes=bytes_count,
+                flags=tcp_flags_str,
                 is_anomaly=False
             )
             db.add(traffic_log)
             db.commit()
             
-            # Update Redis sliding window counters
-            protocol = flow.get('protocol', 0)
-            src_ip = flow.get('src_ip', 'unknown')
-            dst_ip = flow.get('dst_ip', 'unknown')
-            packets = flow.get('packets', 0)
-            
-            # Increment counters with sliding window (60 seconds)
+            # Update Redis sliding window counters (60 seconds)
             current_second = int(datetime.now(timezone.utc).timestamp())
             
             # Traffic counters
@@ -503,7 +520,8 @@ class TrafficCollector:
             self.redis_client.expire(key_proto, 60)
             
             # SYN flag tracking for SYN flood detection (track by destination)
-            if tcp_flags_str and 'SYN' in tcp_flags_str and 'ACK' not in tcp_flags_str:
+            # Check for SYN-only packets: SYN set (0x02), ACK not set (0x10), on TCP protocol (6)
+            if protocol == 6 and (tcp_flags & 0x02) and not (tcp_flags & 0x10):
                 syn_key = f"syn:{isp_id}:{dst_ip}:{current_second}"
                 self.redis_client.incr(syn_key)
                 self.redis_client.expire(syn_key, 60)

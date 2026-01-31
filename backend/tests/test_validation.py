@@ -44,14 +44,10 @@ def test_netflow_v5_parsing():
     
     # Parse flow record (actual NetFlow v5 format)
     offset = 24
-    # NetFlow v5 record is 48 bytes, but our test record is slightly different
-    # Adjust to actual data we packed
-    flow_size = len(packet) - offset
     
     # Parse what we can from the flow
     src_addr = struct.unpack('!I', packet[offset:offset+4])[0]
     dst_addr = struct.unpack('!I', packet[offset+4:offset+8])[0]
-    next_hop_addr = struct.unpack('!I', packet[offset+8:offset+12])[0]
     
     parsed_src_ip = socket.inet_ntoa(struct.pack('!I', src_addr))
     parsed_dst_ip = socket.inet_ntoa(struct.pack('!I', dst_addr))

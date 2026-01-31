@@ -5,8 +5,8 @@ import redis
 import time
 import json
 from datetime import datetime, timedelta, timezone
-from typing import List, Dict, Any
-from collections import defaultdict
+from typing import List
+from collections import defaultdict, Counter
 import math
 
 from database import SessionLocal
@@ -41,9 +41,12 @@ class AnomalyDetector:
                     
                     if count > settings.SYN_FLOOD_THRESHOLD:
                         # Extract destination IP from key
+                        # Expected key format: syn:{isp_id}:{dst_ip}:{timestamp}
                         parts = key.split(':')
-                        if len(parts) >= 3:
-                            dst_ip = parts[2]
+                        if len(parts) >= 4:
+                            # For IPv4, dst_ip is at index 2
+                            # For IPv6, extract everything between second and last colon
+                            dst_ip = ':'.join(parts[2:-1])
                             
                             self.create_alert(
                                 isp_id=isp_id,
@@ -65,23 +68,32 @@ class AnomalyDetector:
         try:
             current_second = int(datetime.now(timezone.utc).timestamp())
             detected = False
-            
-            # Check UDP traffic (protocol 17) in last 60 seconds
-            total_udp_packets = 0
             dst_ip_packets = defaultdict(int)
             
-            for i in range(60):
-                second = current_second - i
-                key = f"traffic:proto:{isp_id}:17:{second}"
-                packets = int(self.redis_client.get(key) or 0)
-                total_udp_packets += packets
+            # Optimize: scan destination keys once and filter by timestamp
+            window_start = current_second - 59
+            pattern = f"traffic:dst:{isp_id}:*"
+            
+            for dst_key in self.redis_client.scan_iter(match=pattern):
+                # Expected key format (IPv4): traffic:dst:{isp_id}:{dst_ip}:{second}
+                parts = dst_key.split(':')
+                if len(parts) < 5:
+                    continue
                 
-                # Also check per-destination
-                pattern = f"traffic:dst:{isp_id}:*:{second}"
-                for dst_key in self.redis_client.scan_iter(match=pattern):
-                    dst_ip = dst_key.split(':')[3]
-                    dst_packets = int(self.redis_client.get(dst_key) or 0)
-                    dst_ip_packets[dst_ip] += dst_packets
+                # Extract timestamp
+                try:
+                    key_second = int(parts[-1])
+                except ValueError:
+                    continue
+                
+                # Check if within time window
+                if key_second < window_start or key_second > current_second:
+                    continue
+                
+                # Extract destination IP (handle IPv6 with colons)
+                dst_ip = ':'.join(parts[3:-1])
+                dst_packets = int(self.redis_client.get(dst_key) or 0)
+                dst_ip_packets[dst_ip] += dst_packets
             
             # Check if any destination exceeds threshold
             for dst_ip, packets in dst_ip_packets.items():
@@ -136,16 +148,12 @@ class AnomalyDetector:
             # Analyze multiple dimensions
             source_ips = [log.source_ip for log in logs]
             dest_ips = [log.dest_ip for log in logs]
-            protocols = [log.protocol for log in logs]
             
             src_entropy = self.calculate_entropy(source_ips)
             dst_entropy = self.calculate_entropy(dest_ips)
-            proto_entropy = self.calculate_entropy(protocols)
             
             # Low source entropy + low destination entropy = distributed DDoS to single target
             if src_entropy < settings.ENTROPY_THRESHOLD and dst_entropy < 1.0:
-                from collections import Counter
-                
                 top_attacker = Counter(source_ips).most_common(1)[0][0] if source_ips else 'unknown'
                 top_target = Counter(dest_ips).most_common(1)[0][0] if dest_ips else 'unknown'
                 
@@ -161,8 +169,6 @@ class AnomalyDetector:
             
             # High source entropy + low destination entropy = volumetric attack
             elif src_entropy > 5.0 and dst_entropy < 2.0:
-                from collections import Counter
-                
                 top_target = Counter(dest_ips).most_common(1)[0][0] if dest_ips else 'unknown'
                 
                 self.create_alert(
@@ -187,21 +193,36 @@ class AnomalyDetector:
         try:
             current_second = int(datetime.now(timezone.utc).timestamp())
             detected = False
-            
-            # Check ICMP traffic (protocol 1) in last 60 seconds
             dst_ip_packets = defaultdict(int)
             
-            for i in range(60):
-                second = current_second - i
-                key = f"traffic:proto:{isp_id}:1:{second}"
+            # Note: Current implementation sums all traffic to destinations
+            # A more accurate implementation would require protocol-specific destination counters
+            # such as traffic:dst:icmp:{isp_id}:{dst_ip}:{second}
+            
+            # Optimize: scan destination keys once and filter by timestamp
+            window_start = current_second - 59
+            pattern = f"traffic:dst:{isp_id}:*"
+            
+            for dst_key in self.redis_client.scan_iter(match=pattern):
+                # Expected key format: traffic:dst:{isp_id}:{dst_ip}:{second}
+                parts = dst_key.split(':')
+                if len(parts) < 5:
+                    continue
                 
-                # Get destination IPs receiving ICMP
-                pattern = f"traffic:dst:{isp_id}:*:{second}"
-                for dst_key in self.redis_client.scan_iter(match=pattern):
-                    # Would need to filter by protocol, but for simplicity check total
-                    dst_ip = dst_key.split(':')[3]
-                    packets = int(self.redis_client.get(dst_key) or 0)
-                    dst_ip_packets[dst_ip] += packets
+                # Extract timestamp
+                try:
+                    key_second = int(parts[-1])
+                except ValueError:
+                    continue
+                
+                # Check if within time window
+                if key_second < window_start or key_second > current_second:
+                    continue
+                
+                # Extract destination IP (handle IPv6 with colons)
+                dst_ip = ':'.join(parts[3:-1])
+                packets = int(self.redis_client.get(dst_key) or 0)
+                dst_ip_packets[dst_ip] += packets
             
             # Check threshold (10000 ICMP packets/min)
             for dst_ip, packets in dst_ip_packets.items():

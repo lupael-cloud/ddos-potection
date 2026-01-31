@@ -2,8 +2,7 @@
 Unit tests for anomaly detector service
 """
 import pytest
-from unittest.mock import Mock, MagicMock, patch, call
-from datetime import datetime, timedelta
+from unittest.mock import MagicMock, patch
 
 from services.anomaly_detector import AnomalyDetector
 

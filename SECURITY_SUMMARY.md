@@ -9,8 +9,9 @@
 
 #### 1. Socket Binding to All Network Interfaces (py/bind-socket-all-network-interfaces)
 **Location:** `backend/services/traffic_collector.py`
-- Line 571: sFlow collector
-- Line 594: IPFIX collector
+- Line 552: NetFlow collector
+- Line 591: sFlow collector
+- Line 616: IPFIX collector
 
 **Status:** ✅ **ACCEPTED - False Positive**
 

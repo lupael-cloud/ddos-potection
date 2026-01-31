@@ -4,8 +4,7 @@ Unit tests for traffic collector service
 import pytest
 import struct
 import socket
-from unittest.mock import Mock, MagicMock, patch
-import redis
+from unittest.mock import MagicMock, patch
 
 from services.traffic_collector import TrafficCollector
 
