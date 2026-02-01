@@ -2128,7 +2128,1281 @@ GEOIP_DB_PATH=/var/lib/geoip/
 
 ### 3. ClickHouse Integration 📊
 
-*(Continuing in next part...)*
+#### Overview
+
+ClickHouse is a high-performance column-oriented database designed for real-time analytical queries. It's perfect for storing and analyzing massive volumes of NetFlow/sFlow data, providing sub-second query times even on billions of records.
+
+#### Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│              ClickHouse Architecture                      │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Traffic Data ──▶ PostgreSQL ──▶ ClickHouse ──▶ Analytics│
+│  (Real-time)      (Operational)  (Historical)  (Queries) │
+│                        │              │            │      │
+│                        ▼              ▼            ▼      │
+│                   Recent Data    Time-series   Aggregated│
+│                   (7 days)       Storage      Reports     │
+│                                  (Billions)              │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Key Benefits
+
+- **Extreme Performance**: Process billions of rows per second with sub-second query times
+- **Efficient Storage**: 10-100x data compression, optimized for time-series data
+- **Scalability**: Horizontal scaling with sharding and distributed queries
+- **Automatic Aggregation**: Materialized views for pre-computed metrics
+- **Long-term Retention**: Store years of historical data efficiently
+
+#### Docker Compose Setup
+
+```yaml
+# Add to docker-compose.yml
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: ddos-clickhouse
+    ports:
+      - "8123:8123"  # HTTP interface
+      - "9000:9000"  # Native protocol
+    environment:
+      CLICKHOUSE_DB: ddos_analytics
+      CLICKHOUSE_USER: clickhouse_user
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD}
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    networks:
+      - ddos-network
+
+volumes:
+  clickhouse_data:
+```
+
+#### Database Schema
+
+```sql
+-- Flow records with 90-day retention
+CREATE TABLE flow_records (
+    timestamp DateTime,
+    src_ip IPv4,
+    dst_ip IPv4,
+    src_port UInt16,
+    dst_port UInt16,
+    protocol UInt8,
+    packets UInt64,
+    bytes UInt64,
+    isp_id UInt32
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (timestamp, src_ip, dst_ip)
+TTL timestamp + INTERVAL 90 DAY;
+
+-- Attack events with 180-day retention
+CREATE TABLE attack_events (
+    timestamp DateTime,
+    target_ip IPv4,
+    attack_type String,
+    severity Enum8('low'=1, 'medium'=2, 'high'=3, 'critical'=4),
+    packets_per_second UInt64,
+    mitigation_applied Boolean
+) ENGINE = MergeTree()
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY (timestamp, target_ip)
+TTL timestamp + INTERVAL 180 DAY;
+
+-- Hourly aggregated statistics
+CREATE MATERIALIZED VIEW traffic_stats_hourly AS
+SELECT
+    toStartOfHour(timestamp) AS hour,
+    isp_id,
+    protocol,
+    sum(packets) AS total_packets,
+    sum(bytes) AS total_bytes,
+    uniq(src_ip) AS unique_sources
+FROM flow_records
+GROUP BY hour, isp_id, protocol;
+```
+
+#### Python Integration
+
+```python
+# backend/services/clickhouse_service.py
+
+from clickhouse_driver import Client
+from typing import List, Dict
+from datetime import datetime, timedelta
+
+class ClickHouseService:
+    def __init__(self):
+        self.client = Client(
+            host='clickhouse',
+            port=9000,
+            database='ddos_analytics'
+        )
+    
+    async def insert_flows(self, records: List[Dict]):
+        """Bulk insert flow records"""
+        data = [(
+            r['timestamp'], r['src_ip'], r['dst_ip'],
+            r['src_port'], r['dst_port'], r['protocol'],
+            r['packets'], r['bytes'], r['isp_id']
+        ) for r in records]
+        
+        self.client.execute(
+            'INSERT INTO flow_records VALUES',
+            data
+        )
+    
+    async def query_top_talkers(self, isp_id: int, hours: int = 24):
+        """Get top traffic sources"""
+        query = """
+        SELECT 
+            src_ip,
+            sum(packets) AS total_packets,
+            sum(bytes) AS total_bytes
+        FROM flow_records
+        WHERE isp_id = %(isp_id)s
+          AND timestamp > now() - INTERVAL %(hours)s HOUR
+        GROUP BY src_ip
+        ORDER BY total_bytes DESC
+        LIMIT 100
+        """
+        return self.client.execute(query, {'isp_id': isp_id, 'hours': hours})
+```
+
+#### Migration from PostgreSQL
+
+```python
+# scripts/migrate_to_clickhouse.py
+
+import asyncio
+import asyncpg
+from clickhouse_driver import Client
+
+async def migrate_data():
+    # Connect to both databases
+    pg = await asyncpg.connect('postgresql://...')
+    ch = Client(host='clickhouse')
+    
+    # Migrate in batches
+    offset = 0
+    batch_size = 10000
+    
+    while True:
+        rows = await pg.fetch(
+            'SELECT * FROM flow_records LIMIT $1 OFFSET $2',
+            batch_size, offset
+        )
+        if not rows:
+            break
+        
+        # Insert into ClickHouse
+        ch.execute('INSERT INTO flow_records VALUES', rows)
+        offset += batch_size
+        print(f"Migrated {offset} records")
+```
+
+---
+
+### 4. Helm Charts for Kubernetes ☸️
+
+#### Overview
+
+Production-ready Helm charts enable easy deployment and management of the DDoS Protection Platform on Kubernetes clusters with automated scaling, configuration management, and integration with the Kubernetes ecosystem.
+
+#### Chart Structure
+
+```
+helm/ddos-protection/
+├── Chart.yaml
+├── values.yaml
+├── templates/
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   ├── configmap.yaml
+│   ├── secret.yaml
+│   ├── ingress.yaml
+│   ├── hpa.yaml
+│   └── pdb.yaml
+└── charts/
+    ├── postgresql/
+    ├── redis/
+    └── clickhouse/
+```
+
+#### Chart.yaml
+
+```yaml
+apiVersion: v2
+name: ddos-protection
+description: A comprehensive DDoS Protection Platform for ISPs
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ddos
+  - security
+  - netflow
+  - isp
+maintainers:
+  - name: DDoS Protection Team
+    email: support@ispbills.com
+dependencies:
+  - name: postgresql
+    version: "12.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "17.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
+```
+
+#### values.yaml
+
+```yaml
+# Global configuration
+global:
+  storageClass: "standard"
+  imagePullSecrets: []
+
+# Backend API configuration
+backend:
+  replicaCount: 3
+  image:
+    repository: ddos-protection/backend
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  
+  resources:
+    requests:
+      memory: "512Mi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "2000m"
+  
+  autoscaling:
+    enabled: true
+    minReplicas: 3
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 80
+    targetMemoryUtilizationPercentage: 80
+  
+  env:
+    - name: DATABASE_URL
+      valueFrom:
+        secretKeyRef:
+          name: ddos-secrets
+          key: database-url
+    - name: REDIS_HOST
+      value: "ddos-redis-master"
+    - name: SECRET_KEY
+      valueFrom:
+        secretKeyRef:
+          name: ddos-secrets
+          key: secret-key
+
+# Frontend configuration
+frontend:
+  replicaCount: 2
+  image:
+    repository: ddos-protection/frontend
+    tag: "latest"
+  
+  service:
+    type: ClusterIP
+    port: 80
+  
+  ingress:
+    enabled: true
+    className: "nginx"
+    annotations:
+      cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    hosts:
+      - host: ddos.example.com
+        paths:
+          - path: /
+            pathType: Prefix
+    tls:
+      - secretName: ddos-tls
+        hosts:
+          - ddos.example.com
+
+# Traffic Collector
+collector:
+  replicaCount: 2
+  image:
+    repository: ddos-protection/collector
+    tag: "latest"
+  
+  service:
+    type: LoadBalancer
+    ports:
+      - name: netflow
+        port: 2055
+        protocol: UDP
+      - name: sflow
+        port: 6343
+        protocol: UDP
+  
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "4000m"
+
+# Anomaly Detector
+detector:
+  replicaCount: 2
+  image:
+    repository: ddos-protection/detector
+    tag: "latest"
+  
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "8Gi"
+      cpu: "4000m"
+
+# PostgreSQL (from Bitnami chart)
+postgresql:
+  enabled: true
+  auth:
+    username: ddos_user
+    password: changeme
+    database: ddos_platform
+  primary:
+    persistence:
+      size: 100Gi
+    resources:
+      requests:
+        memory: "2Gi"
+        cpu: "1000m"
+
+# Redis (from Bitnami chart)
+redis:
+  enabled: true
+  auth:
+    password: changeme
+  master:
+    persistence:
+      size: 10Gi
+  replica:
+    replicaCount: 2
+
+# Monitoring
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+grafana:
+  enabled: true
+  dashboards:
+    default:
+      ddos-overview:
+        json: |
+          {...}
+```
+
+#### Deployment Template
+
+```yaml
+# templates/backend-deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "ddos-protection.fullname" . }}-backend
+  labels:
+    {{- include "ddos-protection.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  {{- if not .Values.backend.autoscaling.enabled }}
+  replicas: {{ .Values.backend.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "ddos-protection.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: backend
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "ddos-protection.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: backend
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: backend
+        image: "{{ .Values.backend.image.repository }}:{{ .Values.backend.image.tag }}"
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+          {{- toYaml .Values.backend.env | nindent 10 }}
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 10 }}
+```
+
+#### HorizontalPodAutoscaler
+
+```yaml
+# templates/hpa.yaml
+
+{{- if .Values.backend.autoscaling.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "ddos-protection.fullname" . }}-backend
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "ddos-protection.fullname" . }}-backend
+  minReplicas: {{ .Values.backend.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.backend.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.backend.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.backend.autoscaling.targetMemoryUtilizationPercentage }}
+{{- end }}
+```
+
+#### Installation Commands
+
+```bash
+# Add Helm repository
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo update
+
+# Install with default values
+helm install ddos-protection ./helm/ddos-protection
+
+# Install with custom values
+helm install ddos-protection ./helm/ddos-protection \
+  -f custom-values.yaml \
+  --namespace ddos-protection \
+  --create-namespace
+
+# Upgrade
+helm upgrade ddos-protection ./helm/ddos-protection
+
+# Uninstall
+helm uninstall ddos-protection
+```
+
+#### Multi-tenant Deployment
+
+```yaml
+# values-tenant1.yaml
+
+backend:
+  env:
+    - name: TENANT_ID
+      value: "tenant1"
+
+ingress:
+  hosts:
+    - host: tenant1.ddos.example.com
+```
+
+---
+
+### 5. Two-Factor Authentication (2FA) 🔐
+
+#### Overview
+
+Implement TOTP-based two-factor authentication to enhance account security. Supports authenticator apps like Google Authenticator and Authy, with backup codes for account recovery.
+
+#### Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                 2FA Authentication Flow                   │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Login ──▶ Password ──▶ 2FA Token ──▶ Access Granted    │
+│  Request   Validation   Verification                     │
+│                │            │                             │
+│                ▼            ▼                             │
+│           Database    TOTP Algorithm                     │
+│           (bcrypt)    (pyotp/RFC 6238)                   │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Backend Implementation
+
+```python
+# backend/services/two_factor_service.py
+
+import pyotp
+import qrcode
+from io import BytesIO
+import base64
+from typing import Dict, List, Optional
+from datetime import datetime
+import secrets
+
+class TwoFactorAuthService:
+    """
+    Two-Factor Authentication service using TOTP
+    """
+    
+    def __init__(self):
+        self.issuer_name = "DDoS Protection Platform"
+    
+    def generate_secret(self) -> str:
+        """Generate a new TOTP secret for a user"""
+        return pyotp.random_base32()
+    
+    def get_totp_uri(self, user_email: str, secret: str) -> str:
+        """
+        Generate TOTP URI for QR code
+        
+        Args:
+            user_email: User's email address
+            secret: TOTP secret
+            
+        Returns:
+            URI string for QR code generation
+        """
+        return pyotp.totp.TOTP(secret).provisioning_uri(
+            name=user_email,
+            issuer_name=self.issuer_name
+        )
+    
+    def generate_qr_code(self, totp_uri: str) -> str:
+        """
+        Generate QR code image as base64 string
+        
+        Args:
+            totp_uri: TOTP URI from get_totp_uri()
+            
+        Returns:
+            Base64 encoded QR code image
+        """
+        qr = qrcode.QRCode(version=1, box_size=10, border=5)
+        qr.add_data(totp_uri)
+        qr.make(fit=True)
+        
+        img = qr.make_image(fill_color="black", back_color="white")
+        
+        # Convert to base64
+        buffer = BytesIO()
+        img.save(buffer, format='PNG')
+        buffer.seek(0)
+        
+        img_base64 = base64.b64encode(buffer.getvalue()).decode()
+        return f"data:image/png;base64,{img_base64}"
+    
+    def verify_totp(self, secret: str, token: str) -> bool:
+        """
+        Verify TOTP token
+        
+        Args:
+            secret: User's TOTP secret
+            token: 6-digit token from authenticator app
+            
+        Returns:
+            True if token is valid
+        """
+        totp = pyotp.TOTP(secret)
+        return totp.verify(token, valid_window=1)  # Allow 1 time step tolerance
+    
+    def generate_backup_codes(self, count: int = 10) -> List[str]:
+        """
+        Generate backup recovery codes
+        
+        Args:
+            count: Number of backup codes to generate
+            
+        Returns:
+            List of backup codes
+        """
+        codes = []
+        for _ in range(count):
+            # Generate 8-character alphanumeric code
+            code = secrets.token_hex(4).upper()
+            codes.append(f"{code[:4]}-{code[4:]}")
+        
+        return codes
+    
+    def hash_backup_code(self, code: str) -> str:
+        """Hash backup code for secure storage"""
+        import bcrypt
+        return bcrypt.hashpw(code.encode(), bcrypt.gensalt()).decode()
+    
+    def verify_backup_code(self, code: str, hashed_code: str) -> bool:
+        """Verify a backup code"""
+        import bcrypt
+        return bcrypt.checkpw(code.encode(), hashed_code.encode())
+
+
+class SMSTwoFactorService:
+    """
+    SMS-based 2FA using Twilio
+    """
+    
+    def __init__(self, twilio_account_sid: str, twilio_auth_token: str, twilio_phone: str):
+        from twilio.rest import Client
+        self.client = Client(twilio_account_sid, twilio_auth_token)
+        self.from_phone = twilio_phone
+    
+    def send_sms_code(self, phone_number: str, code: str) -> bool:
+        """
+        Send 2FA code via SMS
+        
+        Args:
+            phone_number: Recipient phone number
+            code: 6-digit verification code
+            
+        Returns:
+            True if SMS sent successfully
+        """
+        try:
+            message = self.client.messages.create(
+                body=f"Your DDoS Protection Platform verification code is: {code}",
+                from_=self.from_phone,
+                to=phone_number
+            )
+            return message.status in ['queued', 'sent', 'delivered']
+        except Exception as e:
+            print(f"Failed to send SMS: {e}")
+            return False
+    
+    def generate_sms_code(self) -> str:
+        """Generate 6-digit SMS code"""
+        return str(secrets.randbelow(1000000)).zfill(6)
+```
+
+#### Database Schema
+
+```sql
+-- 2FA settings for users
+CREATE TABLE user_2fa (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    is_enabled BOOLEAN DEFAULT FALSE,
+    totp_secret VARCHAR(32),
+    backup_codes JSONB,  -- Array of hashed backup codes
+    sms_enabled BOOLEAN DEFAULT FALSE,
+    phone_number VARCHAR(20),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    enabled_at TIMESTAMP,
+    last_used_at TIMESTAMP,
+    UNIQUE(user_id)
+);
+
+-- 2FA audit log
+CREATE TABLE two_factor_audit (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES users(id),
+    action VARCHAR(50),  -- 'enabled', 'disabled', 'verified', 'failed', 'backup_used'
+    ip_address INET,
+    user_agent TEXT,
+    success BOOLEAN,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_2fa_audit_user (user_id),
+    INDEX idx_2fa_audit_timestamp (created_at)
+);
+```
+
+#### API Endpoints
+
+```python
+# backend/routers/two_factor.py
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from typing import List
+from services.two_factor_service import TwoFactorAuthService, SMSTwoFactorService
+
+router = APIRouter(prefix="/api/v1/2fa", tags=["Two-Factor Authentication"])
+
+class Enable2FAResponse(BaseModel):
+    secret: str
+    qr_code: str
+    backup_codes: List[str]
+
+class Verify2FARequest(BaseModel):
+    token: str
+
+@router.post("/enable", response_model=Enable2FAResponse)
+async def enable_2fa(
+    current_user: dict = Depends(),
+    tfa_service: TwoFactorAuthService = Depends()
+):
+    """
+    Enable 2FA for the current user
+    
+    Returns:
+        - TOTP secret
+        - QR code for authenticator app
+        - Backup recovery codes
+    """
+    # Generate secret
+    secret = tfa_service.generate_secret()
+    
+    # Generate QR code
+    totp_uri = tfa_service.get_totp_uri(current_user['email'], secret)
+    qr_code = tfa_service.generate_qr_code(totp_uri)
+    
+    # Generate backup codes
+    backup_codes = tfa_service.generate_backup_codes()
+    
+    # Store in database (not shown - would hash backup codes)
+    # ...
+    
+    return Enable2FAResponse(
+        secret=secret,
+        qr_code=qr_code,
+        backup_codes=backup_codes
+    )
+
+@router.post("/verify")
+async def verify_2fa_setup(
+    request: Verify2FARequest,
+    current_user: dict = Depends(),
+    tfa_service: TwoFactorAuthService = Depends()
+):
+    """
+    Verify 2FA setup with a test token
+    
+    User must provide a valid token from their authenticator app
+    to complete 2FA setup
+    """
+    # Get user's secret from database
+    secret = "..."  # Retrieved from database
+    
+    if not tfa_service.verify_totp(secret, request.token):
+        raise HTTPException(400, "Invalid verification code")
+    
+    # Mark 2FA as enabled in database
+    # ...
+    
+    return {"status": "success", "message": "2FA enabled successfully"}
+
+@router.post("/disable")
+async def disable_2fa(
+    request: Verify2FARequest,
+    current_user: dict = Depends(),
+    tfa_service: TwoFactorAuthService = Depends()
+):
+    """
+    Disable 2FA (requires valid token)
+    """
+    secret = "..."  # Retrieved from database
+    
+    if not tfa_service.verify_totp(secret, request.token):
+        raise HTTPException(400, "Invalid verification code")
+    
+    # Disable 2FA in database
+    # ...
+    
+    return {"status": "success", "message": "2FA disabled"}
+
+@router.post("/verify-backup-code")
+async def verify_backup_code(
+    code: str,
+    current_user: dict = Depends(),
+    tfa_service: TwoFactorAuthService = Depends()
+):
+    """
+    Use a backup code to bypass 2FA
+    
+    Backup codes are single-use only
+    """
+    # Get unused backup codes from database
+    backup_codes = []  # Retrieved from database
+    
+    for hashed_code in backup_codes:
+        if tfa_service.verify_backup_code(code, hashed_code):
+            # Mark code as used in database
+            # ...
+            return {"status": "success", "message": "Backup code verified"}
+    
+    raise HTTPException(400, "Invalid backup code")
+
+@router.get("/status")
+async def get_2fa_status(current_user: dict = Depends()):
+    """Get 2FA status for current user"""
+    # Query from database
+    return {
+        "enabled": True,
+        "totp_enabled": True,
+        "sms_enabled": False,
+        "backup_codes_remaining": 8
+    }
+```
+
+#### Frontend Component
+
+```javascript
+// frontend/src/components/TwoFactor/Setup2FA.jsx
+
+import React, { useState } from 'react';
+import axios from 'axios';
+
+function Setup2FA() {
+    const [step, setStep] = useState(1);
+    const [qrCode, setQrCode] = useState('');
+    const [backupCodes, setBackupCodes] = useState([]);
+    const [verificationCode, setVerificationCode] = useState('');
+    
+    const handleEnable2FA = async () => {
+        const response = await axios.post('/api/v1/2fa/enable');
+        setQrCode(response.data.qr_code);
+        setBackupCodes(response.data.backup_codes);
+        setStep(2);
+    };
+    
+    const handleVerify = async () => {
+        try {
+            await axios.post('/api/v1/2fa/verify', {
+                token: verificationCode
+            });
+            setStep(3);
+        } catch (error) {
+            alert('Invalid verification code');
+        }
+    };
+    
+    return (
+        <div className="setup-2fa">
+            <h2>🔐 Two-Factor Authentication Setup</h2>
+            
+            {step === 1 && (
+                <div className="step-1">
+                    <p>Add an extra layer of security to your account</p>
+                    <button onClick={handleEnable2FA}>Enable 2FA</button>
+                </div>
+            )}
+            
+            {step === 2 && (
+                <div className="step-2">
+                    <h3>Scan QR Code</h3>
+                    <p>Scan this QR code with your authenticator app:</p>
+                    <img src={qrCode} alt="2FA QR Code" />
+                    
+                    <h3>Verify Setup</h3>
+                    <input
+                        type="text"
+                        placeholder="Enter 6-digit code"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                        maxLength={6}
+                    />
+                    <button onClick={handleVerify}>Verify</button>
+                </div>
+            )}
+            
+            {step === 3 && (
+                <div className="step-3">
+                    <h3>✅ 2FA Enabled Successfully!</h3>
+                    
+                    <h4>Backup Codes</h4>
+                    <p>Save these codes in a safe place. Each code can be used once.</p>
+                    <div className="backup-codes">
+                        {backupCodes.map((code, idx) => (
+                            <code key={idx}>{code}</code>
+                        ))}
+                    </div>
+                    
+                    <button onClick={() => window.print()}>Print Codes</button>
+                </div>
+            )}
+        </div>
+    );
+}
+
+export default Setup2FA;
+```
+
+---
+
+### 6. Slack Integration 💬
+
+#### Overview
+
+Real-time Slack integration provides instant attack notifications, rich message formatting, and interactive buttons for quick mitigation actions directly from Slack.
+
+#### Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│                 Slack Integration Flow                    │
+├──────────────────────────────────────────────────────────┤
+│                                                           │
+│  Attack ──▶ Alert ──▶ Slack API ──▶ Channel Message     │
+│  Detected   System    (Webhook)     (Rich Format)        │
+│                │           │              │               │
+│                ▼           ▼              ▼               │
+│           Database    Format Msg    Interactive          │
+│                       (Blocks)      Buttons              │
+└──────────────────────────────────────────────────────────┘
+```
+
+#### Backend Implementation
+
+```python
+# backend/services/slack_service.py
+
+import aiohttp
+from typing import Dict, List, Optional
+from datetime import datetime
+
+class SlackService:
+    """
+    Slack integration service for attack notifications
+    """
+    
+    def __init__(self, webhook_url: str, bot_token: Optional[str] = None):
+        self.webhook_url = webhook_url
+        self.bot_token = bot_token
+    
+    async def send_attack_notification(self, attack_data: Dict):
+        """
+        Send formatted attack notification to Slack
+        
+        Args:
+            attack_data: Dictionary containing attack information
+        """
+        severity_emoji = {
+            'low': ':large_yellow_circle:',
+            'medium': ':large_orange_circle:',
+            'high': ':red_circle:',
+            'critical': ':rotating_light:'
+        }
+        
+        severity = attack_data.get('severity', 'medium')
+        
+        message = {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"{severity_emoji.get(severity, '')} DDoS Attack Detected",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Target IP:*\n{attack_data.get('target_ip')}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Attack Type:*\n{attack_data.get('attack_type')}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Severity:*\n{severity.upper()}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Traffic Volume:*\n{attack_data.get('packets_per_second'):,} pps"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Source Count:*\n{attack_data.get('source_count', 0):,} IPs"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Time:*\n{datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')} UTC"
+                        }
+                    ]
+                },
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Block IP"
+                            },
+                            "style": "danger",
+                            "value": f"block_{attack_data.get('target_ip')}",
+                            "action_id": "block_ip"
+                        },
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "View Details"
+                            },
+                            "value": f"details_{attack_data.get('alert_id')}",
+                            "action_id": "view_details"
+                        },
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "False Positive"
+                            },
+                            "value": f"false_{attack_data.get('alert_id')}",
+                            "action_id": "mark_false_positive"
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        await self._send_message(message)
+    
+    async def send_mitigation_update(self, mitigation_data: Dict):
+        """Send mitigation status update"""
+        message = {
+            "blocks": [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"✅ *Mitigation Applied*\n" \
+                                f"Target: {mitigation_data.get('target_ip')}\n" \
+                                f"Method: {mitigation_data.get('method')}\n" \
+                                f"Status: Active"
+                    }
+                }
+            ]
+        }
+        
+        await self._send_message(message)
+    
+    async def send_platform_status(self, status_data: Dict):
+        """Send platform health status"""
+        status_emoji = "✅" if status_data.get('healthy') else "❌"
+        
+        message = {
+            "blocks": [
+                {
+                    "type": "header",
+                    "text": {
+                        "type": "plain_text",
+                        "text": f"{status_emoji} Platform Status",
+                        "emoji": True
+                    }
+                },
+                {
+                    "type": "section",
+                    "fields": [
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*API:* {status_data.get('api_status')}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Database:* {status_data.get('db_status')}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Collector:* {status_data.get('collector_status')}"
+                        },
+                        {
+                            "type": "mrkdwn",
+                            "text": f"*Active Alerts:* {status_data.get('active_alerts')}"
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        await self._send_message(message)
+    
+    async def _send_message(self, message: Dict):
+        """Send message to Slack webhook"""
+        async with aiohttp.ClientSession() as session:
+            async with session.post(self.webhook_url, json=message) as response:
+                if response.status != 200:
+                    print(f"Failed to send Slack message: {response.status}")
+                else:
+                    print("Slack notification sent successfully")
+    
+    async def handle_interactive_action(self, payload: Dict):
+        """
+        Handle interactive button clicks from Slack
+        
+        This would be called from a webhook endpoint
+        """
+        action = payload.get('actions', [{}])[0]
+        action_id = action.get('action_id')
+        value = action.get('value')
+        
+        if action_id == 'block_ip':
+            # Extract IP and trigger blocking
+            ip = value.replace('block_', '')
+            # Call mitigation service
+            return {"response": f"Blocking {ip}..."}
+        
+        elif action_id == 'mark_false_positive':
+            # Mark alert as false positive
+            alert_id = value.replace('false_', '')
+            # Update database
+            return {"response": "Marked as false positive"}
+        
+        return {"response": "Action completed"}
+```
+
+#### API Endpoints
+
+```python
+# backend/routers/slack_integration.py
+
+from fastapi import APIRouter, Request, Depends, HTTPException
+from pydantic import BaseModel
+from typing import Optional
+from services.slack_service import SlackService
+
+router = APIRouter(prefix="/api/v1/slack", tags=["Slack Integration"])
+
+class SlackConfig(BaseModel):
+    webhook_url: str
+    channel: str
+    enabled: bool = True
+
+@router.post("/configure")
+async def configure_slack(
+    config: SlackConfig,
+    isp_id: int,
+    current_user: dict = Depends()
+):
+    """
+    Configure Slack integration for an ISP
+    
+    Args:
+        webhook_url: Slack incoming webhook URL
+        channel: Target Slack channel
+        enabled: Enable/disable notifications
+    """
+    # Store configuration in database
+    # ...
+    
+    return {
+        "status": "success",
+        "message": "Slack integration configured",
+        "config": config.dict()
+    }
+
+@router.post("/test")
+async def test_slack_integration(
+    isp_id: int,
+    slack_service: SlackService = Depends()
+):
+    """
+    Send a test notification to Slack
+    """
+    test_attack = {
+        'target_ip': '192.168.1.100',
+        'attack_type': 'SYN Flood',
+        'severity': 'medium',
+        'packets_per_second': 50000,
+        'source_count': 1500,
+        'alert_id': 12345
+    }
+    
+    await slack_service.send_attack_notification(test_attack)
+    
+    return {"status": "success", "message": "Test notification sent"}
+
+@router.post("/webhook")
+async def slack_webhook(request: Request):
+    """
+    Handle interactive actions from Slack
+    
+    This endpoint receives callbacks when users click buttons
+    """
+    payload = await request.json()
+    
+    # Verify request is from Slack (check signing secret)
+    # ...
+    
+    slack_service = SlackService(webhook_url="...")
+    result = await slack_service.handle_interactive_action(payload)
+    
+    return result
+
+@router.get("/status")
+async def get_slack_status(isp_id: int):
+    """Get Slack integration status"""
+    # Query from database
+    return {
+        "enabled": True,
+        "webhook_configured": True,
+        "channel": "#ddos-alerts",
+        "notifications_sent_today": 45
+    }
+```
+
+#### Configuration
+
+```yaml
+# config/slack.yaml
+
+slack:
+  enabled: true
+  
+  # Webhook configuration (per ISP)
+  webhooks:
+    default: "${SLACK_WEBHOOK_URL}"
+  
+  # Notification settings
+  notifications:
+    attack_detected: true
+    mitigation_applied: true
+    mitigation_removed: true
+    platform_status: false
+  
+  # Alert thresholds
+  thresholds:
+    min_severity: "medium"  # Only send medium+ severity
+    rate_limit: 10  # Max notifications per minute
+  
+  # Message formatting
+  formatting:
+    include_charts: false
+    include_geo_data: true
+    timezone: "UTC"
+```
 
 ---
 
