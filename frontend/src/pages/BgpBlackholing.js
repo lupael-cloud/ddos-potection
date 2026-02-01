@@ -339,6 +339,7 @@ function BgpBlackholing() {
                         {mitigation.details?.prefix || 'N/A'}
                       </code>
                     </td>
+                    {/* API returns alert.type (not alert.alert_type) */}
                     <td>{mitigation.alert?.type || 'N/A'}</td>
                     <td>
                       <span
@@ -400,6 +401,7 @@ function BgpBlackholing() {
                   .map((mitigation) => (
                     <tr key={mitigation.id}>
                       <td>#{mitigation.id}</td>
+                      {/* API returns alert.type (not alert.alert_type) */}
                       <td>{mitigation.alert?.type || 'N/A'}</td>
                       <td>{mitigation.alert?.target_ip || 'N/A'}</td>
                       <td>
