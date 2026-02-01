@@ -4,6 +4,7 @@ Anomaly detection engine for DDoS attacks
 import redis
 import time
 import json
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List
 from collections import defaultdict, Counter
@@ -12,6 +13,7 @@ import math
 from database import SessionLocal
 from models.models import Alert, TrafficLog
 from config import settings
+from services.notification_service import notify_alert
 
 class AnomalyDetector:
     def __init__(self):
@@ -323,12 +325,13 @@ class AnomalyDetector:
             alert_key = f"alert:{alert.id}"
             alert_data = {
                 'id': alert.id,
-                'type': alert_type,
+                'alert_type': alert_type,  # Changed from 'type' to 'alert_type' for consistency
                 'severity': severity,
                 'target_ip': target_ip,
                 'source_ip': source_ip,
                 'description': description,
-                'timestamp': datetime.now(timezone.utc).isoformat()
+                'timestamp': datetime.now(timezone.utc).isoformat(),
+                'isp_id': isp_id  # Include ISP ID for tenant isolation
             }
             self.redis_client.setex(
                 alert_key,
@@ -336,7 +339,9 @@ class AnomalyDetector:
                 json.dumps(alert_data)
             )
             
-            # Publish alert to pub/sub channel
+            # Publish alert to ISP-specific pub/sub channel for tenant isolation
+            self.redis_client.publish(f'alerts:new:{isp_id}', json.dumps(alert_data))
+            # Also publish to general channel for backwards compatibility
             self.redis_client.publish('alerts:new', json.dumps(alert_data))
             
             # Add to alerts stream
@@ -344,10 +349,36 @@ class AnomalyDetector:
             
             print(f"Alert created: {alert_type} [{severity}] - {description}")
             
+            # Send notifications asynchronously
+            # If an event loop is running, schedule the task; otherwise run it in a
+            # temporary event loop so notifications are not silently skipped.
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop in this thread: run the coroutine to completion.
+                try:
+                    asyncio.run(self._send_alert_notifications(alert_data))
+                except Exception as e:
+                    print(f"Error sending alert notifications (asyncio.run): {e}")
+            else:
+                # Event loop is running: schedule fire-and-forget task.
+                try:
+                    loop.create_task(self._send_alert_notifications(alert_data))
+                except Exception as e:
+                    print(f"Error scheduling alert notifications: {e}")
+            
         except Exception as e:
             print(f"Error creating alert: {e}")
         finally:
             db.close()
+    
+    async def _send_alert_notifications(self, alert_data: dict):
+        """Send alert notifications through configured channels"""
+        try:
+            # Send notifications (email, SMS, Telegram)
+            await notify_alert(alert_data)
+        except Exception as e:
+            print(f"Error sending alert notifications: {e}")
     
     def run_detection_loop(self):
         """Main detection loop"""

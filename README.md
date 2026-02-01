@@ -358,13 +358,51 @@ curl -X POST http://localhost:8000/api/v1/alerts/1/resolve \
 
 ## 📊 Monitoring
 
-The platform includes Prometheus and Grafana for comprehensive monitoring:
+The platform includes comprehensive monitoring and alerting capabilities:
 
-- Traffic metrics (packets/sec, bytes/sec)
-- Alert statistics
-- API performance
-- Database queries
-- System resources
+### Prometheus Metrics
+- **Traffic metrics**: packets/sec, bytes/sec, flow counts by protocol
+- **Alert metrics**: active alerts, severity distribution, resolution rates
+- **Mitigation metrics**: active mitigations, success rates, duration histograms
+- **Attack detection**: attack types, volumes, targets
+- **System health**: database, Redis, API status
+
+### Grafana Dashboards
+- **DDoS Overview**: Real-time operational dashboard with traffic stats and alerts
+- **Attack Analysis**: Detailed attack visualization with geographic data
+- **Mitigation Status**: Track active and historical mitigations with success metrics
+- **System Health**: Monitor database connections, API performance, and resource usage
+
+### Multi-channel Alerts
+- **Email notifications**: HTML-formatted alerts with severity color coding
+- **SMS alerts**: Twilio-based SMS for critical incidents (concise format)
+- **Telegram notifications**: Rich formatted messages with emoji indicators
+- Configurable per ISP with channel preferences
+
+### Live Attack Maps
+- **Real-time visualization**: WebSocket-based attack streaming
+- **Geographic mapping**: Source and target IP geolocation
+- **Attack heatmaps**: Aggregate attack data by region and time
+- **Statistics dashboard**: Attack counts, types, and targets
+
+### API Endpoints
+```bash
+# Prometheus metrics
+GET /metrics
+
+# Live attack data
+GET /api/v1/attack-map/live-attacks
+GET /api/v1/attack-map/attack-heatmap
+GET /api/v1/attack-map/attack-statistics
+WS  /api/v1/attack-map/ws/live-attacks
+
+# Mitigation status
+GET /api/v1/mitigation/status/active
+GET /api/v1/mitigation/status/history
+GET /api/v1/mitigation/status/analytics
+```
+
+For detailed monitoring setup and configuration, see [Monitoring Guide](docs/MONITORING.md).
 
 ## 🧪 Testing
 
@@ -383,7 +421,9 @@ npm test
 - [Quick Start Guide](QUICKSTART.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
 - [Development Guide](docs/DEVELOPMENT.md)
+- [Monitoring & Alerting Guide](docs/MONITORING.md) - Comprehensive guide for Prometheus, Grafana, and notifications
 - [BGP Blackholing (RTBH) Guide](docs/BGP-RTBH.md) - Setup and use BGP-based DDoS mitigation
+- [Traffic Collection Guide](docs/TRAFFIC_COLLECTION.md)
 - [Security Documentation](SECURITY.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
