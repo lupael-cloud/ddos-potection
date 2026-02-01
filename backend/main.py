@@ -13,7 +13,8 @@ from routers import (
     auth_router,
     attack_map_router,
     hostgroup_router,
-    capture_router
+    capture_router,
+    traffic_collection_router
 )
 from database import engine, Base
 from config import settings
@@ -57,6 +58,7 @@ app.include_router(reports_router.router, prefix="/api/v1/reports", tags=["Repor
 app.include_router(attack_map_router.router, prefix="/api/v1/attack-map", tags=["Attack Map"])
 app.include_router(hostgroup_router.router)  # Already has prefix in router definition
 app.include_router(capture_router.router)  # Already has prefix in router definition
+app.include_router(traffic_collection_router.router, prefix="/api/v1/traffic-collection", tags=["Traffic Collection"])
 
 @app.get("/")
 async def root():
