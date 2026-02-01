@@ -4,6 +4,7 @@ Anomaly detection engine for DDoS attacks
 import redis
 import time
 import json
+import asyncio
 from datetime import datetime, timedelta, timezone
 from typing import List
 from collections import defaultdict, Counter
@@ -12,6 +13,7 @@ import math
 from database import SessionLocal
 from models.models import Alert, TrafficLog
 from config import settings
+from services.notification_service import notify_alert
 
 class AnomalyDetector:
     def __init__(self):
@@ -344,10 +346,21 @@ class AnomalyDetector:
             
             print(f"Alert created: {alert_type} [{severity}] - {description}")
             
+            # Send notifications asynchronously
+            asyncio.create_task(self._send_alert_notifications(alert_data))
+            
         except Exception as e:
             print(f"Error creating alert: {e}")
         finally:
             db.close()
+    
+    async def _send_alert_notifications(self, alert_data: dict):
+        """Send alert notifications through configured channels"""
+        try:
+            # Send notifications (email, SMS, Telegram)
+            await notify_alert(alert_data)
+        except Exception as e:
+            print(f"Error sending alert notifications: {e}")
     
     def run_detection_loop(self):
         """Main detection loop"""

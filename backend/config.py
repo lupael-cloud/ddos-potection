@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_CHAT_ID: str = ""
     
+    # SMS/Twilio
+    TWILIO_ACCOUNT_SID: str = ""
+    TWILIO_AUTH_TOKEN: str = ""
+    TWILIO_PHONE_NUMBER: str = ""
+    
     # Payment
     STRIPE_API_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
