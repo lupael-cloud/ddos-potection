@@ -209,5 +209,149 @@ def test_alert_summary():
     assert "by_status" in data
     assert "by_severity" in data
 
+def test_metrics_endpoint():
+    """Test Prometheus metrics endpoint"""
+    response = client.get("/metrics")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "text/plain; version=0.0.4; charset=utf-8"
+    # Check that at least one metric is present
+    content = response.content.decode()
+    assert "ddos_" in content
+
+def test_attack_map_live_attacks():
+    """Test attack map live attacks endpoint"""
+    # Register and login
+    user_data = {
+        "username": "attackmaptest",
+        "email": "attackmap@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get live attacks
+    response = client.get("/api/v1/attack-map/live-attacks", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "attacks" in data
+    assert "last_updated" in data
+
+def test_attack_map_heatmap():
+    """Test attack map heatmap endpoint"""
+    # Register and login
+    user_data = {
+        "username": "heatmaptest",
+        "email": "heatmap@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get heatmap
+    response = client.get("/api/v1/attack-map/attack-heatmap?hours=24", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "period_hours" in data
+    assert "heatmap" in data
+    assert "generated_at" in data
+
+def test_attack_map_statistics():
+    """Test attack map statistics endpoint"""
+    # Register and login
+    user_data = {
+        "username": "statstest",
+        "email": "stats@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get statistics
+    response = client.get("/api/v1/attack-map/attack-statistics", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_attacks_24h" in data
+    assert "active_attacks" in data
+    assert "attacks_by_type" in data
+    assert "top_targets" in data
+
+def test_mitigation_status_active():
+    """Test mitigation status active endpoint"""
+    # Register and login
+    user_data = {
+        "username": "mitigationtest",
+        "email": "mitigation@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get active mitigations
+    response = client.get("/api/v1/mitigation/status/active", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "total" in data
+    assert "mitigations" in data
+
+def test_mitigation_status_history():
+    """Test mitigation status history endpoint"""
+    # Register and login
+    user_data = {
+        "username": "historytest",
+        "email": "history@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get mitigation history
+    response = client.get("/api/v1/mitigation/status/history?hours=24", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "period_hours" in data
+    assert "total_mitigations" in data
+    assert "history" in data
+    assert "statistics" in data
+
+def test_mitigation_status_analytics():
+    """Test mitigation status analytics endpoint"""
+    # Register and login
+    user_data = {
+        "username": "analyticstest",
+        "email": "analytics@example.com",
+        "password": "testpassword123",
+        "isp_name": "Test ISP",
+        "role": "admin"
+    }
+    register_response = client.post("/api/v1/auth/register", json=user_data)
+    token = register_response.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    
+    # Get analytics
+    response = client.get("/api/v1/mitigation/status/analytics", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "period" in data
+    assert "total_mitigations" in data
+    assert "active_mitigations" in data
+    assert "success_rate_percent" in data
+    assert "most_used_types" in data
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
