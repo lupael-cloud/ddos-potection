@@ -70,6 +70,31 @@ export const mitigationService = {
   create: (mitigation) => api.post('/mitigation/', mitigation),
   execute: (id) => api.post(`/mitigation/${id}/execute`),
   stop: (id) => api.post(`/mitigation/${id}/stop`),
+  /**
+   * Get active mitigation status
+   * @returns {Promise} Response with { total, mitigations: Array }
+   *   Each mitigation contains { id, alert_id, action_type, status, details, 
+   *   created_at, duration_seconds, alert: { type, severity, target_ip, source_ip } }
+   *   NOTE: The nested alert object uses 'type' (not 'alert_type') as the property name.
+   *   This is different from the /alerts/ endpoint which uses 'alert_type'.
+   */
+  getActiveStatus: () => api.get('/mitigation/status/active'),
+  /**
+   * Get mitigation history
+   * @param {number} hours - Number of hours to look back (default: 24)
+   * @returns {Promise} Response with { period_hours, total_mitigations, history: Array, statistics }
+   *   Each history item contains { id, action_type, status, created_at, completed_at,
+   *   duration_seconds, alert: { id, type, severity, target_ip } }
+   *   NOTE: The nested alert object uses 'type' (not 'alert_type') as the property name.
+   *   This is different from the /alerts/ endpoint which uses 'alert_type'.
+   */
+  getHistory: (hours = 24) => api.get(`/mitigation/status/history?hours=${hours}`),
+  /**
+   * Get mitigation analytics
+   * @returns {Promise} Response with { period, total_mitigations, active_mitigations, 
+   *   success_rate_percent, most_used_types }
+   */
+  getAnalytics: () => api.get('/mitigation/status/analytics'),
 };
 
 // ISP endpoints
@@ -85,6 +110,26 @@ export const reportsService = {
   list: () => api.get('/reports/'),
   generate: (reportType) => api.post(`/reports/generate?report_type=${reportType}`),
   download: (id) => api.get(`/reports/${id}/download`, { responseType: 'blob' }),
+};
+
+// Packet Capture endpoints
+export const captureService = {
+  start: (captureData) => api.post('/capture/start', captureData),
+  stop: (captureId) => api.post(`/capture/stop/${captureId}`),
+  status: (captureId) => api.get(`/capture/status/${captureId}`),
+  list: () => api.get('/capture/list'),
+  download: (filename) => api.get(`/capture/download/${filename}`, { responseType: 'blob' }),
+  cleanup: (maxAgeDays = 7) => api.delete(`/capture/cleanup?max_age_days=${maxAgeDays}`),
+};
+
+// Hostgroup endpoints
+export const hostgroupService = {
+  list: () => api.get('/hostgroups/'),
+  create: (hostgroup) => api.post('/hostgroups/', hostgroup),
+  get: (name) => api.get(`/hostgroups/${name}`),
+  delete: (name) => api.delete(`/hostgroups/${name}`),
+  checkIp: (ip) => api.post('/hostgroups/check-ip', { ip }),
+  getDefaults: () => api.get('/hostgroups/defaults/thresholds'),
 };
 
 export default api;

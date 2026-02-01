@@ -1,14 +1,59 @@
-# DDoS Protection Platform for ISPs
+<div align="center">
 
-A comprehensive, full-stack DDoS protection platform designed for Internet Service Providers (ISPs). This platform provides real-time traffic monitoring, anomaly detection, automated mitigation, and a beautiful web dashboard for managing DDoS attacks.
+# 🛡️ DDoS Protection Platform for ISPs
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![React](https://img.shields.io/badge/react-18.0+-61DAFB.svg?logo=react)](https://reactjs.org/)
+[![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg?logo=docker)](https://www.docker.com/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104+-009688.svg?logo=fastapi)](https://fastapi.tiangolo.com/)
+
+**A comprehensive, enterprise-grade DDoS protection platform designed for Internet Service Providers (ISPs)**
+
+Real-time traffic monitoring • Anomaly detection • Automated mitigation • Beautiful web dashboard
+
+[Features](#-features) • [Quick Start](#-quick-start) • [Documentation](#-documentation) • [Screenshots](#-screenshots)
+
+</div>
+
+---
+
+## 📑 Table of Contents
+
+- [Features](#-features)
+- [Screenshots](#-screenshots)
+- [Requirements](#-requirements)
+- [Quick Start](#-quick-start)
+- [Router Integration](#-router-integration)
+- [API Documentation](#-api-documentation)
+- [Architecture](#️-architecture)
+- [Technology Stack](#-technology-stack)
+- [Security](#-security)
+- [Monitoring](#-monitoring)
+- [Testing](#-testing)
+- [Documentation](#-documentation)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Support](#-support)
 
 ## 🚀 Features
 
 ### Traffic Collection & Detection
 - **NetFlow/sFlow/IPFIX Support**: Collect traffic data from MikroTik, Cisco, and Juniper routers
+- **PCAP Capture**: Record packets with standard PCAP format for analysis
+- **AF_PACKET/AF_XDP**: High-performance packet capture for Linux systems
+- **VLAN Untagging**: Automatic removal of 802.1Q and 802.1ad VLAN tags
 - **Real-time Anomaly Detection**: Detect SYN floods, UDP floods, and other attack patterns
+- **Attack Fingerprinting**: Automatically capture attack traffic in PCAP format
 - **Entropy Analysis**: Identify distributed attacks using statistical analysis
 - **Redis Integration**: Fast real-time counters and event streaming
+
+### Threshold Management
+- **Hostgroups**: Configure per-subnet thresholds for packets/bytes/flows per second
+- **Longest Prefix Match**: Hierarchical subnet configuration with most specific match
+- **Default Thresholds**: System-wide defaults for networks without specific configuration
+- **Script Execution**: Trigger custom block/notify scripts when thresholds exceeded
+- **Dynamic Configuration**: Update thresholds without service restart
 
 ### Mitigation & Automation
 - **Automated Firewall Rules**: Support for iptables/nftables
@@ -37,6 +82,44 @@ A comprehensive, full-stack DDoS protection platform designed for Internet Servi
 - **Multi-channel Alerts**: Email, SMS, and Telegram notifications
 - **Live Attack Maps**: Visualize attacks in real-time
 - **Mitigation Status**: Track active and historical mitigations
+
+## 📸 Screenshots
+
+### Dashboard Overview
+<div align="center">
+
+![Dashboard](https://github.com/user-attachments/assets/477edd08-aee4-4c7a-9b7a-b07452e2252e)
+
+*Real-time monitoring dashboard showing traffic statistics, active alerts, and system health*
+
+</div>
+
+### Traffic Monitor
+<div align="center">
+
+![Traffic Monitor](https://github.com/user-attachments/assets/3b9173ed-128a-4c9f-98ef-6e81a4b6148c)
+
+*Live traffic visualization with protocol distribution and attack pattern detection*
+
+</div>
+
+### Alert Management
+<div align="center">
+
+![Alerts](https://github.com/user-attachments/assets/e3646f08-32fe-4d81-8f07-612535751de1)
+
+*Comprehensive alert dashboard with severity levels and real-time notifications*
+
+</div>
+
+### Rule Management
+<div align="center">
+
+![Rules](https://github.com/user-attachments/assets/42a87a3f-4bb7-48df-a71c-792f62c5935d)
+
+*Intuitive interface for creating and managing DDoS mitigation rules*
+
+</div>
 
 ## 📋 Requirements
 
@@ -212,6 +295,60 @@ curl -X POST http://localhost:8000/api/v1/alerts/1/resolve \
   -H "Authorization: Bearer <token>"
 ```
 
+### Packet Capture
+```bash
+# Start PCAP capture
+curl -X POST http://localhost:8000/api/v1/capture/start \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "interface": "eth0",
+    "capture_mode": "af_packet",
+    "duration": 60,
+    "filter_bpf": "tcp and port 80"
+  }'
+
+# List captures
+curl -X GET http://localhost:8000/api/v1/capture/list \
+  -H "Authorization: Bearer <token>"
+
+# Download PCAP file
+curl -X GET http://localhost:8000/api/v1/capture/download/capture_20260201_123456.pcap \
+  -H "Authorization: Bearer <token>" \
+  -o capture.pcap
+```
+
+### Hostgroups (Per-Subnet Thresholds)
+```bash
+# Create hostgroup
+curl -X POST http://localhost:8000/api/v1/hostgroups/ \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "name": "customer_network_1",
+    "subnet": "192.168.1.0/24",
+    "thresholds": {
+      "packets_per_second": 10000,
+      "bytes_per_second": 100000000,
+      "flows_per_second": 1000
+    },
+    "scripts": {
+      "block": "/etc/ddos-protection/scripts/block.sh",
+      "notify": "/etc/ddos-protection/scripts/notify.sh"
+    }
+  }'
+
+# List hostgroups
+curl -X GET http://localhost:8000/api/v1/hostgroups/ \
+  -H "Authorization: Bearer <token>"
+
+# Check IP thresholds
+curl -X POST http://localhost:8000/api/v1/hostgroups/check-ip \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"ip": "192.168.1.50"}'
+```
+
 ## 🏗️ Architecture
 
 ```
@@ -245,6 +382,36 @@ curl -X POST http://localhost:8000/api/v1/alerts/1/resolve \
       └───────────┘ └──────────┘ └──────────┘ └────────┘
 ```
 
+## 💻 Technology Stack
+
+### Backend
+- **FastAPI** - High-performance Python web framework
+- **PostgreSQL 15** - Primary data storage
+- **Redis 7** - Real-time caching and pub/sub
+- **SQLAlchemy** - ORM for database operations
+- **Pydantic** - Data validation and settings
+- **Celery** - Distributed task queue (optional)
+
+### Frontend
+- **React 18** - Modern UI framework
+- **Chart.js** - Beautiful data visualization
+- **Axios** - HTTP client
+- **React Router** - Navigation
+- **CSS3** - Responsive styling
+
+### DevOps & Monitoring
+- **Docker & Docker Compose** - Containerization
+- **Prometheus** - Metrics collection
+- **Grafana** - Monitoring dashboards
+- **Kubernetes** - Production orchestration (optional)
+- **GitHub Actions** - CI/CD pipeline
+
+### Network Protocols
+- **NetFlow v9/v10** - Cisco traffic export
+- **sFlow** - Real-time traffic sampling
+- **IPFIX** - IP Flow Information Export
+- **BGP/ExaBGP** - Route advertisements for mitigation
+
 ## 🔒 Security
 
 - **TLS/SSL**: All communications encrypted
@@ -256,13 +423,51 @@ curl -X POST http://localhost:8000/api/v1/alerts/1/resolve \
 
 ## 📊 Monitoring
 
-The platform includes Prometheus and Grafana for comprehensive monitoring:
+The platform includes comprehensive monitoring and alerting capabilities:
 
-- Traffic metrics (packets/sec, bytes/sec)
-- Alert statistics
-- API performance
-- Database queries
-- System resources
+### Prometheus Metrics
+- **Traffic metrics**: packets/sec, bytes/sec, flow counts by protocol
+- **Alert metrics**: active alerts, severity distribution, resolution rates
+- **Mitigation metrics**: active mitigations, success rates, duration histograms
+- **Attack detection**: attack types, volumes, targets
+- **System health**: database, Redis, API status
+
+### Grafana Dashboards
+- **DDoS Overview**: Real-time operational dashboard with traffic stats and alerts
+- **Attack Analysis**: Detailed attack visualization with geographic data
+- **Mitigation Status**: Track active and historical mitigations with success metrics
+- **System Health**: Monitor database connections, API performance, and resource usage
+
+### Multi-channel Alerts
+- **Email notifications**: HTML-formatted alerts with severity color coding
+- **SMS alerts**: Twilio-based SMS for critical incidents (concise format)
+- **Telegram notifications**: Rich formatted messages with emoji indicators
+- Configurable per ISP with channel preferences
+
+### Live Attack Maps
+- **Real-time visualization**: WebSocket-based attack streaming
+- **Geographic mapping**: Source and target IP geolocation
+- **Attack heatmaps**: Aggregate attack data by region and time
+- **Statistics dashboard**: Attack counts, types, and targets
+
+### API Endpoints
+```bash
+# Prometheus metrics
+GET /metrics
+
+# Live attack data
+GET /api/v1/attack-map/live-attacks
+GET /api/v1/attack-map/attack-heatmap
+GET /api/v1/attack-map/attack-statistics
+WS  /api/v1/attack-map/ws/live-attacks
+
+# Mitigation status
+GET /api/v1/mitigation/status/active
+GET /api/v1/mitigation/status/history
+GET /api/v1/mitigation/status/analytics
+```
+
+For detailed monitoring setup and configuration, see [Monitoring Guide](docs/MONITORING.md).
 
 ## 🧪 Testing
 
@@ -281,31 +486,55 @@ npm test
 - [Quick Start Guide](QUICKSTART.md)
 - [Deployment Guide](docs/DEPLOYMENT.md)
 - [Development Guide](docs/DEVELOPMENT.md)
+- [Packet Capture & Thresholds Guide](docs/PACKET_CAPTURE.md) - PCAP, AF_PACKET, AF_XDP, VLAN untagging, and hostgroups
+- [Monitoring & Alerting Guide](docs/MONITORING.md) - Comprehensive guide for Prometheus, Grafana, and notifications
 - [BGP Blackholing (RTBH) Guide](docs/BGP-RTBH.md) - Setup and use BGP-based DDoS mitigation
+- [Traffic Collection Guide](docs/TRAFFIC_COLLECTION.md)
 - [Security Documentation](SECURITY.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our contributing guidelines before submitting PRs.
+Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting PRs.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
 
 ## 📝 License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-For support and questions:
-- GitHub Issues: https://github.com/i4edubd/ddos-potection/issues
-- Email: support@example.com
+Need help? We're here for you!
+
+- 📖 [Documentation](docs/)
+- 🐛 [GitHub Issues](https://github.com/i4edubd/ddos-potection/issues)
+- 💬 [Discussions](https://github.com/i4edubd/ddos-potection/discussions)
+- 📧 Email: support@example.com
 
 ## 🙏 Acknowledgments
 
-- FastAPI for the excellent Python web framework
-- React for the frontend framework
-- PostgreSQL and Redis for data storage
-- Prometheus and Grafana for monitoring
+Special thanks to these amazing open-source projects:
+
+- [FastAPI](https://fastapi.tiangolo.com/) - Excellent Python web framework
+- [React](https://reactjs.org/) - Modern UI framework
+- [PostgreSQL](https://www.postgresql.org/) - Robust database
+- [Redis](https://redis.io/) - Fast in-memory data store
+- [Prometheus](https://prometheus.io/) & [Grafana](https://grafana.com/) - Monitoring stack
 
 ---
 
+<div align="center">
+
+**⭐ Star this project if you find it useful! ⭐**
+
 **Made with ❤️ for ISPs worldwide**
+
+![GitHub stars](https://img.shields.io/github/stars/i4edubd/ddos-potection?style=social)
+![GitHub forks](https://img.shields.io/github/forks/i4edubd/ddos-potection?style=social)
+
+</div>

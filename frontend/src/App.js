@@ -8,6 +8,8 @@ import Rules from './pages/Rules';
 import Alerts from './pages/Alerts';
 import Reports from './pages/Reports';
 import Settings from './pages/Settings';
+import PacketCapture from './pages/PacketCapture';
+import Hostgroups from './pages/Hostgroups';
 
 function App() {
   const isAuthenticated = () => {
@@ -68,6 +70,22 @@ function App() {
             element={
               <PrivateRoute>
                 <Settings />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/capture"
+            element={
+              <PrivateRoute>
+                <PacketCapture />
+              </PrivateRoute>
+            }
+          />
+          <Route
+            path="/hostgroups"
+            element={
+              <PrivateRoute>
+                <Hostgroups />
               </PrivateRoute>
             }
           />

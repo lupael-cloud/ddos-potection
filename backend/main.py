@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import uvicorn
@@ -10,10 +10,14 @@ from routers import (
     isp_router,
     alerts_router,
     reports_router,
-    auth_router
+    auth_router,
+    attack_map_router,
+    hostgroup_router,
+    capture_router
 )
 from database import engine, Base
 from config import settings
+from services.metrics_collector import get_metrics_content, CONTENT_TYPE_LATEST
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
@@ -50,6 +54,9 @@ app.include_router(mitigation_router.router, prefix="/api/v1/mitigation", tags=[
 app.include_router(isp_router.router, prefix="/api/v1/isp", tags=["ISP Management"])
 app.include_router(alerts_router.router, prefix="/api/v1/alerts", tags=["Alerts"])
 app.include_router(reports_router.router, prefix="/api/v1/reports", tags=["Reports"])
+app.include_router(attack_map_router.router, prefix="/api/v1/attack-map", tags=["Attack Map"])
+app.include_router(hostgroup_router.router)  # Already has prefix in router definition
+app.include_router(capture_router.router)  # Already has prefix in router definition
 
 @app.get("/")
 async def root():
@@ -62,6 +69,12 @@ async def root():
 @app.get("/health")
 async def health_check():
     return {"status": "healthy"}
+
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    metrics_data = get_metrics_content()
+    return Response(content=metrics_data, media_type=CONTENT_TYPE_LATEST)
 
 if __name__ == "__main__":
     uvicorn.run(

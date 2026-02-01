@@ -124,7 +124,26 @@ async def execute_mitigation(
             source = mitigation.details.get('source')
             dest = mitigation.details.get('destination')
             protocol = mitigation.details.get('protocol')
-            success = service.send_flowspec_rule(source, dest, protocol)
+            action = mitigation.details.get('action', 'drop')
+            source_port = mitigation.details.get('source_port')
+            dest_port = mitigation.details.get('dest_port')
+            packet_length = mitigation.details.get('packet_length')
+            dscp = mitigation.details.get('dscp')
+            fragment = mitigation.details.get('fragment')
+            tcp_flags = mitigation.details.get('tcp_flags')
+            
+            success = service.send_flowspec_rule(
+                source=source,
+                dest=dest,
+                protocol=protocol,
+                action=action,
+                source_port=source_port,
+                dest_port=dest_port,
+                packet_length=packet_length,
+                dscp=dscp,
+                fragment=fragment,
+                tcp_flags=tcp_flags
+            )
         
         else:
             error_message = f"Unknown action type: {mitigation.action_type}"
@@ -194,8 +213,11 @@ async def stop_mitigation(
                 error_message = "Missing 'prefix' in mitigation details"
         
         elif mitigation.action_type == "flowspec":
-            # Withdraw FlowSpec rule (implementation depends on BGP daemon)
-            success = True  # Placeholder
+            # Withdraw FlowSpec rule
+            source = mitigation.details.get('source')
+            dest = mitigation.details.get('destination')
+            protocol = mitigation.details.get('protocol')
+            success = service.withdraw_flowspec_rule(source, dest, protocol)
         
         else:
             error_message = f"Unknown action type: {mitigation.action_type}"
@@ -205,7 +227,7 @@ async def stop_mitigation(
     
     if success:
         mitigation.status = "completed"
-        mitigation.completed_at = datetime.utcnow()
+        mitigation.completed_at = datetime.now(timezone.utc)
         db.commit()
         return {"message": "Mitigation stopped successfully", "status": "completed"}
     else:
@@ -222,3 +244,193 @@ async def stop_mitigation(
             status_code=500,
             detail=f"Failed to stop mitigation: {error_message or 'Unknown error'}"
         )
+
+
+@router.get("/status/active")
+async def get_active_mitigations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get all active mitigations with detailed status"""
+    from sqlalchemy import func
+    
+    active_mitigations = db.query(
+        MitigationAction,
+        Alert.target_ip,
+        Alert.source_ip,
+        Alert.alert_type,
+        Alert.severity
+    ).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.status == 'active'
+    ).all()
+    
+    result = []
+    for mitigation, target_ip, source_ip, alert_type, severity in active_mitigations:
+        duration_seconds = (datetime.now(timezone.utc) - mitigation.created_at).total_seconds()
+        result.append({
+            'id': mitigation.id,
+            'alert_id': mitigation.alert_id,
+            'action_type': mitigation.action_type,
+            'status': mitigation.status,
+            'details': mitigation.details,
+            'created_at': mitigation.created_at.isoformat(),
+            'duration_seconds': int(duration_seconds),
+            'alert': {
+                'type': alert_type,
+                'severity': severity,
+                'target_ip': target_ip,
+                'source_ip': source_ip
+            }
+        })
+    
+    return {
+        'total': len(result),
+        'mitigations': result
+    }
+
+
+@router.get("/status/history")
+async def get_mitigation_history(
+    hours: int = 24,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get mitigation history with statistics"""
+    from sqlalchemy import func
+    from datetime import timedelta, timezone
+    
+    time_ago = datetime.now(timezone.utc) - timedelta(hours=hours)
+    
+    # Get historical mitigations
+    history = db.query(MitigationAction, Alert).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.created_at >= time_ago
+    ).order_by(MitigationAction.created_at.desc()).limit(100).all()
+    
+    # Statistics
+    stats = db.query(
+        MitigationAction.action_type,
+        MitigationAction.status,
+        func.count(MitigationAction.id).label('count')
+    ).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.created_at >= time_ago
+    ).group_by(MitigationAction.action_type, MitigationAction.status).all()
+    
+    # Calculate average duration for completed mitigations
+    avg_durations = db.query(
+        MitigationAction.action_type,
+        func.avg(
+            func.extract('epoch', MitigationAction.completed_at - MitigationAction.created_at)
+        ).label('avg_duration')
+    ).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.status == 'completed',
+        MitigationAction.completed_at.isnot(None),
+        MitigationAction.created_at >= time_ago
+    ).group_by(MitigationAction.action_type).all()
+    
+    # Format history
+    history_list = []
+    for mitigation, alert in history:
+        duration_seconds = None
+        if mitigation.completed_at:
+            duration_seconds = (mitigation.completed_at - mitigation.created_at).total_seconds()
+        
+        history_list.append({
+            'id': mitigation.id,
+            'action_type': mitigation.action_type,
+            'status': mitigation.status,
+            'created_at': mitigation.created_at.isoformat(),
+            'completed_at': mitigation.completed_at.isoformat() if mitigation.completed_at else None,
+            'duration_seconds': int(duration_seconds) if duration_seconds else None,
+            'alert': {
+                'id': alert.id,
+                'type': alert.alert_type,
+                'severity': alert.severity,
+                'target_ip': alert.target_ip
+            }
+        })
+    
+    # Format statistics
+    stats_by_type = {}
+    for stat in stats:
+        if stat.action_type not in stats_by_type:
+            stats_by_type[stat.action_type] = {}
+        stats_by_type[stat.action_type][stat.status] = stat.count
+    
+    # Format average durations
+    avg_duration_by_type = {d.action_type: int(d.avg_duration) for d in avg_durations if d.avg_duration}
+    
+    return {
+        'period_hours': hours,
+        'total_mitigations': len(history_list),
+        'history': history_list,
+        'statistics': {
+            'by_type_and_status': stats_by_type,
+            'average_duration_seconds': avg_duration_by_type
+        }
+    }
+
+
+@router.get("/status/analytics")
+async def get_mitigation_analytics(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Get comprehensive mitigation analytics"""
+    from sqlalchemy import func
+    from datetime import timedelta, timezone
+    
+    now = datetime.now(timezone.utc)
+    
+    # Last 24 hours
+    last_24h = now - timedelta(hours=24)
+    
+    # Total mitigations by period
+    total_24h = db.query(func.count(MitigationAction.id)).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.created_at >= last_24h
+    ).scalar() or 0
+    
+    # Active mitigations
+    active_count = db.query(func.count(MitigationAction.id)).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.status == 'active'
+    ).scalar() or 0
+    
+    # Success rate (completed vs failed)
+    total_completed_or_failed = db.query(func.count(MitigationAction.id)).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.status.in_(['completed', 'failed']),
+        MitigationAction.created_at >= last_24h
+    ).scalar() or 0
+    
+    completed_count = db.query(func.count(MitigationAction.id)).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.status == 'completed',
+        MitigationAction.created_at >= last_24h
+    ).scalar() or 0
+    
+    success_rate = (completed_count / total_completed_or_failed * 100) if total_completed_or_failed > 0 else 0
+    
+    # Most used mitigation types
+    most_used = db.query(
+        MitigationAction.action_type,
+        func.count(MitigationAction.id).label('count')
+    ).join(Alert).filter(
+        Alert.isp_id == current_user.isp_id,
+        MitigationAction.created_at >= last_24h
+    ).group_by(MitigationAction.action_type).order_by(func.count(MitigationAction.id).desc()).all()
+    
+    # Average response time (time from alert creation to mitigation creation)
+    # This would require joining with alerts and calculating the difference
+    
+    return {
+        'period': '24h',
+        'total_mitigations': total_24h,
+        'active_mitigations': active_count,
+        'success_rate_percent': round(success_rate, 2),
+        'most_used_types': [{'type': m.action_type, 'count': m.count} for m in most_used]
+    }
