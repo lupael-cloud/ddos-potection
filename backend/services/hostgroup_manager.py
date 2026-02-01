@@ -264,7 +264,12 @@ class HostGroupManager:
             alert_id: Alert ID
         """
         # Prepare environment variables for scripts
-        env = {
+        # Only pass specific safe environment variables to avoid exposing secrets
+        safe_env_vars = ['PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'LC_ALL']
+        safe_env = {k: v for k, v in os.environ.items() if k in safe_env_vars}
+        
+        script_env = {
+            **safe_env,
             'TARGET_IP': ip,
             'ALERT_ID': str(alert_id),
             'EXCEEDED_METRICS': json.dumps(exceeded),
@@ -277,7 +282,7 @@ class HostGroupManager:
                 print(f"Executing block script for {ip}")
                 result = subprocess.run(
                     [scripts['block'], ip],
-                    env={**env, **dict(os.environ)},
+                    env=script_env,
                     capture_output=True,
                     timeout=30,
                     text=True
@@ -294,7 +299,7 @@ class HostGroupManager:
                 print(f"Executing notify script for {ip}")
                 result = subprocess.run(
                     [scripts['notify'], ip, str(alert_id)],
-                    env={**env, **dict(os.environ)},
+                    env=script_env,
                     capture_output=True,
                     timeout=30,
                     text=True

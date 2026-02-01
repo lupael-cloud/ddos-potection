@@ -135,10 +135,14 @@ class PacketCaptureService:
                 
                 # Apply VLAN untagging if enabled
                 if self.vlan_untagging_enabled:
+                    cleaned_packets = []
                     for pkt in packets:
                         if pkt.haslayer(Dot1Q):
-                            # Remove VLAN layer
-                            pkt = pkt[Dot1Q].payload
+                            # Remove VLAN layer and use payload
+                            cleaned_packets.append(pkt[Dot1Q].payload)
+                        else:
+                            cleaned_packets.append(pkt)
+                    packets = cleaned_packets
                 
                 wrpcap(str(pcap_file), packets)
                 print(f"Captured {len(packets)} packets to {pcap_file}")
