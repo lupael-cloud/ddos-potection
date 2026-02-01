@@ -75,7 +75,8 @@ export const mitigationService = {
    * @returns {Promise} Response with { total, mitigations: Array }
    *   Each mitigation contains { id, alert_id, action_type, status, details, 
    *   created_at, duration_seconds, alert: { type, severity, target_ip, source_ip } }
-   *   Note: alert.type contains the alert_type value from the database
+   *   NOTE: The nested alert object uses 'type' (not 'alert_type') as the property name.
+   *   This is different from the /alerts/ endpoint which uses 'alert_type'.
    */
   getActiveStatus: () => api.get('/mitigation/status/active'),
   /**
@@ -84,7 +85,8 @@ export const mitigationService = {
    * @returns {Promise} Response with { period_hours, total_mitigations, history: Array, statistics }
    *   Each history item contains { id, action_type, status, created_at, completed_at,
    *   duration_seconds, alert: { id, type, severity, target_ip } }
-   *   Note: alert.type contains the alert_type value from the database
+   *   NOTE: The nested alert object uses 'type' (not 'alert_type') as the property name.
+   *   This is different from the /alerts/ endpoint which uses 'alert_type'.
    */
   getHistory: (hours = 24) => api.get(`/mitigation/status/history?hours=${hours}`),
   /**

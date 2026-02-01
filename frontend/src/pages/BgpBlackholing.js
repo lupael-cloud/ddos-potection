@@ -18,13 +18,6 @@ function BgpBlackholing() {
   });
   const navigate = useNavigate();
 
-  useEffect(() => {
-    loadData();
-    // Refresh data every 30 seconds
-    const interval = setInterval(loadData, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
   const loadData = async () => {
     try {
       const [activeMitigationsRes, historyRes, analyticsRes, alertsRes] = await Promise.all([
@@ -44,6 +37,15 @@ function BgpBlackholing() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    loadData();
+    // Refresh data every 30 seconds
+    // Cleanup function properly stops the interval when component unmounts
+    const interval = setInterval(loadData, 30000);
+    return () => clearInterval(interval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
