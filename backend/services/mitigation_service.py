@@ -5,6 +5,7 @@ import subprocess
 import ipaddress
 import os
 import errno
+import re
 from datetime import datetime
 
 from database import SessionLocal
@@ -495,7 +496,6 @@ class MitigationService:
             # Packet length
             if packet_length:
                 # Validate packet_length contains only safe characters
-                import re
                 if not re.match(r'^[<>=&0-9\s]+$', str(packet_length)):
                     print(f"FlowSpec error: Invalid packet_length format '{packet_length}'")
                     return False
@@ -551,7 +551,6 @@ class MitigationService:
                 action_spec = "rate-limit 0"
             elif action.startswith("rate-limit"):
                 # Validate and extract rate
-                import re
                 match = re.match(r'^rate-limit\s+(\d+)$', action)
                 if match:
                     rate_value = match.group(1)

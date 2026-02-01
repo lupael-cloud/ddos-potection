@@ -326,7 +326,14 @@ class RuleEngine:
             return False
     
     def cleanup_expired_rules(self):
-        """Remove or deactivate rules that have expired"""
+        """Remove or deactivate rules that have expired
+        
+        Note: This fetches all active rules and filters in Python rather than
+        using database-level JSON filtering because SQLAlchemy's JSON contains()
+        operator doesn't work reliably for checking key existence across different
+        database backends. For large rule sets, consider adding a dedicated
+        expires_at column for more efficient querying.
+        """
         try:
             # Find all active rules; filter by expires_at in Python
             expired_rules = self.db.query(Rule).filter(
