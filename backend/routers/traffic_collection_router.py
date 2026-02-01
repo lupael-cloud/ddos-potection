@@ -21,19 +21,6 @@ redis_client = redis.Redis(
     decode_responses=True
 )
 
-class DetectionConfig(BaseModel):
-    syn_flood_threshold: int
-    udp_flood_threshold: int
-    entropy_threshold: float
-    
-class CollectionStatus(BaseModel):
-    netflow_enabled: bool
-    sflow_enabled: bool
-    ipfix_enabled: bool
-    netflow_port: int
-    sflow_port: int
-    ipfix_port: int
-
 @router.get("/config")
 async def get_detection_config(current_user: User = Depends(get_current_user)):
     """Get current detection configuration"""
@@ -72,28 +59,52 @@ async def get_router_status(
     db: Session = Depends(get_db)
 ):
     """Get detected routers and their vendors"""
-    from sqlalchemy import func, distinct
+    # Try to get router vendor info from Redis cache (populated by traffic_collector)
+    # The traffic collector caches router vendors using keys like "router:vendor:{ip}"
+    routers_list = []
     
-    # Get unique source IPs from traffic logs as potential routers
-    routers = db.query(
-        TrafficLog.source_ip,
-        func.count(TrafficLog.id).label("flow_count"),
-        func.max(TrafficLog.timestamp).label("last_seen")
-    ).filter(
-        TrafficLog.isp_id == current_user.isp_id
-    ).group_by(TrafficLog.source_ip).limit(20).all()
+    try:
+        # Scan for router vendor keys in Redis
+        for key in redis_client.scan_iter(match="router:vendor:*"):
+            router_ip = key.replace("router:vendor:", "")
+            vendor = redis_client.get(key) or "Auto-detected"
+            
+            # Get flow count from database for this ISP
+            from sqlalchemy import func
+            flow_stats = db.query(
+                func.count(TrafficLog.id).label("flow_count"),
+                func.max(TrafficLog.timestamp).label("last_seen")
+            ).filter(
+                TrafficLog.isp_id == current_user.isp_id
+            ).first()
+            
+            routers_list.append({
+                "ip": router_ip,
+                "vendor": vendor,
+                "flow_count": flow_stats.flow_count if flow_stats else 0,
+                "last_seen": flow_stats.last_seen.isoformat() if flow_stats and flow_stats.last_seen else None
+            })
+    except Exception as e:
+        print(f"Error fetching router info: {e}")
     
-    return {
-        "routers": [
-            {
-                "ip": r.source_ip,
-                "vendor": "Auto-detected",
-                "flow_count": r.flow_count,
-                "last_seen": r.last_seen.isoformat() if r.last_seen else None
-            }
-            for r in routers
-        ]
-    }
+    # If no routers found in cache, return empty list with helpful message
+    if not routers_list:
+        # Still get some stats from database to show activity
+        from sqlalchemy import func
+        recent_stats = db.query(
+            func.count(TrafficLog.id).label("total_flows"),
+            func.max(TrafficLog.timestamp).label("last_activity")
+        ).filter(
+            TrafficLog.isp_id == current_user.isp_id
+        ).first()
+        
+        return {
+            "routers": [],
+            "total_flows": recent_stats.total_flows if recent_stats else 0,
+            "last_activity": recent_stats.last_activity.isoformat() if recent_stats and recent_stats.last_activity else None
+        }
+    
+    return {"routers": routers_list}
 
 @router.get("/entropy")
 async def get_entropy_analysis(
