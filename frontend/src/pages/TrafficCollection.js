@@ -30,6 +30,10 @@ function TrafficCollection() {
       setLoading(false);
     } catch (error) {
       console.error('Error loading traffic collection data:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
       setLoading(false);
     }
   };

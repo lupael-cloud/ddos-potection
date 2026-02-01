@@ -1,8 +1,32 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 function Navbar({ onLogout }) {
   const [showTrafficMenu, setShowTrafficMenu] = useState(false);
+  const dropdownRef = useRef(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setShowTrafficMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      setShowTrafficMenu(!showTrafficMenu);
+    } else if (event.key === 'Escape') {
+      setShowTrafficMenu(false);
+    }
+  };
 
   return (
     <div className="navbar">
@@ -13,64 +37,29 @@ function Navbar({ onLogout }) {
         
         {/* Traffic Collection & Detection Dropdown */}
         <div 
-          style={{ position: 'relative', display: 'inline-block' }}
+          className="dropdown"
+          ref={dropdownRef}
           onMouseEnter={() => setShowTrafficMenu(true)}
           onMouseLeave={() => setShowTrafficMenu(false)}
         >
-          <span style={{ cursor: 'pointer', padding: '0.5rem 1rem' }}>
+          <button
+            className="dropdown-trigger"
+            onClick={() => setShowTrafficMenu(!showTrafficMenu)}
+            onKeyDown={handleKeyDown}
+            aria-haspopup="true"
+            aria-expanded={showTrafficMenu}
+          >
             Collection & Detection ▼
-          </span>
+          </button>
           {showTrafficMenu && (
-            <div style={{
-              position: 'absolute',
-              top: '100%',
-              left: 0,
-              background: 'white',
-              boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
-              borderRadius: '4px',
-              minWidth: '200px',
-              zIndex: 1000,
-              marginTop: '0.5rem'
-            }}>
-              <Link 
-                to="/traffic-collection" 
-                style={{
-                  display: 'block',
-                  padding: '0.75rem 1rem',
-                  color: '#333',
-                  textDecoration: 'none',
-                  borderBottom: '1px solid #eee'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                onMouseLeave={(e) => e.target.style.background = 'white'}
-              >
+            <div className="dropdown-menu" role="menu">
+              <Link to="/traffic-collection" role="menuitem">
                 Traffic Collection
               </Link>
-              <Link 
-                to="/anomaly-detection" 
-                style={{
-                  display: 'block',
-                  padding: '0.75rem 1rem',
-                  color: '#333',
-                  textDecoration: 'none',
-                  borderBottom: '1px solid #eee'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                onMouseLeave={(e) => e.target.style.background = 'white'}
-              >
+              <Link to="/anomaly-detection" role="menuitem">
                 Anomaly Detection
               </Link>
-              <Link 
-                to="/entropy-analysis" 
-                style={{
-                  display: 'block',
-                  padding: '0.75rem 1rem',
-                  color: '#333',
-                  textDecoration: 'none'
-                }}
-                onMouseEnter={(e) => e.target.style.background = '#f8f9fa'}
-                onMouseLeave={(e) => e.target.style.background = 'white'}
-              >
+              <Link to="/entropy-analysis" role="menuitem">
                 Entropy Analysis
               </Link>
             </div>

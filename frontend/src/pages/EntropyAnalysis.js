@@ -21,6 +21,10 @@ function EntropyAnalysis() {
       setLoading(false);
     } catch (error) {
       console.error('Error loading entropy data:', error);
+      if (error.response?.status === 401) {
+        localStorage.removeItem('token');
+        navigate('/login');
+      }
       setLoading(false);
     }
   };
