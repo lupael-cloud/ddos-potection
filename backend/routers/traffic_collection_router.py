@@ -97,9 +97,12 @@ async def get_router_status(
             
             router_ip = key.replace("router:vendor:", "")
             
-            # Validate IP format (basic check)
-            if not router_ip or router_ip.count('.') not in [3, 7]:  # IPv4 or IPv6
-                continue
+            # Validate IP format using standard library
+            try:
+                import ipaddress
+                ipaddress.ip_address(router_ip)
+            except ValueError:
+                continue  # Skip invalid IP addresses
             
             vendor = redis_client.get(key) or "Auto-detected"
             
@@ -218,8 +221,6 @@ async def get_entropy_analysis(
         
         entropy = 0.0
         for count in frequencies.values():
-            if count <= 0:  # Skip invalid counts
-                continue
             probability = count / total
             if probability > 0:  # Avoid log(0)
                 entropy -= probability * math.log2(probability)

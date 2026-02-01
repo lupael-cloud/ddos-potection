@@ -20,7 +20,10 @@ function Navbar({ onLogout }) {
   }, []);
 
   const handleKeyDown = (event) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      setShowTrafficMenu(!showTrafficMenu);
+    } else if (event.key === ' ') {
       event.preventDefault();
       setShowTrafficMenu(!showTrafficMenu);
     } else if (event.key === 'Escape') {
