@@ -3,13 +3,13 @@ API endpoints for packet capture management
 """
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import FileResponse
-from typing import List, Optional
+from typing import Optional
 from pydantic import BaseModel
-from pathlib import Path
 
 from routers.auth_router import get_current_user
 from services.packet_capture import get_packet_capture_service
 from models.models import User
+from config import settings
 
 router = APIRouter(prefix="/api/v1/capture", tags=["packet-capture"])
 
@@ -53,6 +53,8 @@ async def start_capture(
     
     try:
         if request.capture_mode == "pcap":
+            if not getattr(settings, 'PCAP_ENABLED', True):
+                raise HTTPException(status_code=400, detail="PCAP capture mode is disabled")
             capture_id = service.start_pcap_capture(
                 interface=request.interface,
                 filter_bpf=request.filter_bpf or "",
@@ -60,11 +62,15 @@ async def start_capture(
                 target_ip=request.target_ip
             )
         elif request.capture_mode == "af_packet":
+            if not getattr(settings, 'AF_PACKET_ENABLED', True):
+                raise HTTPException(status_code=400, detail="AF_PACKET capture mode is disabled")
             capture_id = service.start_af_packet_capture(
                 interface=request.interface,
                 duration=request.duration
             )
         elif request.capture_mode == "af_xdp":
+            if not getattr(settings, 'AF_XDP_ENABLED', False):
+                raise HTTPException(status_code=400, detail="AF_XDP capture mode is disabled")
             capture_id = service.start_af_xdp_capture(
                 interface=request.interface,
                 duration=request.duration

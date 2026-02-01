@@ -52,14 +52,28 @@ function Hostgroups() {
     e.preventDefault();
     setError(null);
     
+    // Basic client-side validation for numeric thresholds
+    const packetsPerSecond = parseInt(hostgroupForm.packets_per_second, 10);
+    const bytesPerSecond = parseInt(hostgroupForm.bytes_per_second, 10);
+    const flowsPerSecond = parseInt(hostgroupForm.flows_per_second, 10);
+
+    if (
+      Number.isNaN(packetsPerSecond) ||
+      Number.isNaN(bytesPerSecond) ||
+      Number.isNaN(flowsPerSecond)
+    ) {
+      setError('Please enter valid numeric values for all threshold fields.');
+      return;
+    }
+    
     try {
       const payload = {
         name: hostgroupForm.name,
         subnet: hostgroupForm.subnet,
         thresholds: {
-          packets_per_second: parseInt(hostgroupForm.packets_per_second),
-          bytes_per_second: parseInt(hostgroupForm.bytes_per_second),
-          flows_per_second: parseInt(hostgroupForm.flows_per_second)
+          packets_per_second: packetsPerSecond,
+          bytes_per_second: bytesPerSecond,
+          flows_per_second: flowsPerSecond
         },
         scripts: {}
       };

@@ -6,6 +6,7 @@ import os
 import ipaddress
 import json
 import subprocess
+import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timezone
 import redis
@@ -13,6 +14,8 @@ import redis
 from config import settings
 from database import SessionLocal
 from models.models import Alert
+
+logger = logging.getLogger(__name__)
 
 
 class HostGroup:
@@ -263,6 +266,14 @@ class HostGroupManager:
             exceeded: Exceeded thresholds
             alert_id: Alert ID
         """
+        # Check if script execution is enabled
+        if not getattr(settings, 'SCRIPTS_ENABLED', True):
+            logger.info("Script execution is disabled in configuration")
+            return
+        
+        # Get configured timeout
+        script_timeout = getattr(settings, 'SCRIPT_TIMEOUT', 30)
+        
         # Prepare environment variables for scripts
         # Only pass specific safe environment variables to avoid exposing secrets
         safe_env_vars = ['PATH', 'HOME', 'USER', 'SHELL', 'LANG', 'LC_ALL']
@@ -278,42 +289,60 @@ class HostGroupManager:
         
         # Execute block script
         if 'block' in scripts and scripts['block']:
+            # Optional: Validate script path is under SCRIPTS_DIR
+            scripts_dir = getattr(settings, 'SCRIPTS_DIR', None)
+            if scripts_dir:
+                script_path = os.path.abspath(scripts['block'])
+                allowed_dir = os.path.abspath(scripts_dir)
+                if not script_path.startswith(allowed_dir):
+                    logger.warning(f"Block script {script_path} is outside allowed directory {allowed_dir}")
+                    return
+            
             try:
-                print(f"Executing block script for {ip}")
+                logger.info(f"Executing block script for {ip}")
                 result = subprocess.run(
                     [scripts['block'], ip],
                     env=script_env,
                     capture_output=True,
-                    timeout=30,
+                    timeout=script_timeout,
                     text=True
                 )
-                print(f"Block script output: {result.stdout}")
+                logger.info(f"Block script output: {result.stdout}")
                 if result.returncode != 0:
-                    print(f"Block script error: {result.stderr}")
+                    logger.error(f"Block script error: {result.stderr}")
             except Exception as e:
-                print(f"Error executing block script: {e}")
+                logger.error(f"Error executing block script: {e}")
         
         # Execute notify script
         if 'notify' in scripts and scripts['notify']:
+            # Optional: Validate script path is under SCRIPTS_DIR
+            scripts_dir = getattr(settings, 'SCRIPTS_DIR', None)
+            if scripts_dir:
+                script_path = os.path.abspath(scripts['notify'])
+                allowed_dir = os.path.abspath(scripts_dir)
+                if not script_path.startswith(allowed_dir):
+                    logger.warning(f"Notify script {script_path} is outside allowed directory {allowed_dir}")
+                    return
+            
             try:
-                print(f"Executing notify script for {ip}")
+                logger.info(f"Executing notify script for {ip}")
                 result = subprocess.run(
                     [scripts['notify'], ip, str(alert_id)],
                     env=script_env,
                     capture_output=True,
-                    timeout=30,
+                    timeout=script_timeout,
                     text=True
                 )
-                print(f"Notify script output: {result.stdout}")
+                logger.info(f"Notify script output: {result.stdout}")
                 if result.returncode != 0:
-                    print(f"Notify script error: {result.stderr}")
+                    logger.error(f"Notify script error: {result.stderr}")
             except Exception as e:
-                print(f"Error executing notify script: {e}")
+                logger.error(f"Error executing notify script: {e}")
     
     def monitor_traffic(self, isp_id: int = 1):
         """
         Monitor traffic and check thresholds
-        Should be called periodically (e.g., every second)
+        Should be called periodically based on THRESHOLD_CHECK_INTERVAL setting
         
         Args:
             isp_id: ISP ID to monitor
@@ -329,7 +358,6 @@ class HostGroupManager:
                 parts = key.split(':')
                 if len(parts) >= 5:
                     dst_ip = ':'.join(parts[3:-1])
-                    packets = int(self.redis_client.get(key) or 0)
                     
                     if dst_ip not in dst_metrics:
                         dst_metrics[dst_ip] = {
@@ -338,14 +366,55 @@ class HostGroupManager:
                             'flows_per_second': 0
                         }
                     
+                    raw_value = self.redis_client.get(key)
+                    if raw_value is None:
+                        continue
+                    
+                    # Decode bytes values if needed
+                    if isinstance(raw_value, bytes):
+                        try:
+                            raw_value = raw_value.decode("utf-8")
+                        except Exception:
+                            # Fallback: treat undecodable value as zero
+                            continue
+                    
+                    # Prefer JSON payloads with explicit metrics; fall back to legacy int values
+                    packets = 0
+                    bytes_count = 0
+                    flows_count = 0
+                    if isinstance(raw_value, str):
+                        try:
+                            metric_obj = json.loads(raw_value)
+                        except Exception:
+                            metric_obj = None
+                        
+                        if isinstance(metric_obj, dict):
+                            packets = int(metric_obj.get("packets", 0) or 0)
+                            bytes_count = int(metric_obj.get("bytes", 0) or 0)
+                            flows_count = int(metric_obj.get("flows", 0) or 0)
+                        else:
+                            # Legacy format: treat value as packet count
+                            try:
+                                packets = int(raw_value or 0)
+                            except ValueError:
+                                packets = 0
+                    else:
+                        # Non-string value (e.g., integer) from Redis
+                        try:
+                            packets = int(raw_value or 0)
+                        except (TypeError, ValueError):
+                            packets = 0
+                    
                     dst_metrics[dst_ip]['packets_per_second'] += packets
+                    dst_metrics[dst_ip]['bytes_per_second'] += bytes_count
+                    dst_metrics[dst_ip]['flows_per_second'] += flows_count
             
             # Check thresholds for each IP
             for ip, metrics in dst_metrics.items():
                 self.check_thresholds(ip, metrics, isp_id)
                 
         except Exception as e:
-            print(f"Error monitoring traffic: {e}")
+            logger.error(f"Error monitoring traffic: {e}")
     
     def list_hostgroups(self) -> List[Dict[str, Any]]:
         """List all hostgroups"""

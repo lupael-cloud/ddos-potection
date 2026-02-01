@@ -2,7 +2,7 @@
 API endpoints for hostgroup and threshold management
 """
 from fastapi import APIRouter, HTTPException, Depends
-from typing import List, Dict, Any, Optional
+from typing import Dict, Optional
 from pydantic import BaseModel
 
 from routers.auth_router import get_current_user

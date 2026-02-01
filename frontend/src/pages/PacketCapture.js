@@ -5,7 +5,6 @@ import Navbar from '../components/Navbar';
 
 function PacketCapture() {
   const [captures, setCaptures] = useState([]);
-  const [captureStatus, setCaptureStatus] = useState({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showStartForm, setShowStartForm] = useState(false);
@@ -49,18 +48,6 @@ function PacketCapture() {
       loadCaptures();
     } catch (err) {
       setError(err.response?.data?.detail || 'Failed to start capture');
-    }
-  };
-
-  const handleStopCapture = async (captureId) => {
-    if (!window.confirm('Stop this capture?')) return;
-    
-    try {
-      await captureService.stop(captureId);
-      alert('Capture stopped');
-      loadCaptures();
-    } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to stop capture');
     }
   };
 
@@ -171,7 +158,16 @@ function PacketCapture() {
                   <input
                     type="number"
                     value={captureForm.duration}
-                    onChange={(e) => setCaptureForm({...captureForm, duration: parseInt(e.target.value)})}
+                    onChange={(e) => {
+                      const rawValue = e.target.value;
+                      const parsed = parseInt(rawValue, 10);
+                      if (Number.isNaN(parsed)) {
+                        // Ignore non-numeric input to avoid storing NaN in state
+                        return;
+                      }
+                      const clamped = Math.min(3600, Math.max(10, parsed));
+                      setCaptureForm({ ...captureForm, duration: clamped });
+                    }}
                     min="10"
                     max="3600"
                     required

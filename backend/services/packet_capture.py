@@ -2,7 +2,6 @@
 Packet capture service supporting PCAP, AF_PACKET, and AF_XDP
 Includes VLAN untagging and attack fingerprint capture
 """
-import os
 import socket
 import struct
 import threading
@@ -11,18 +10,20 @@ from typing import Dict, Any, Optional, List
 from pathlib import Path
 import redis
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
-    from scapy.all import wrpcap, Ether, IP, TCP, UDP, ICMP, Raw, rdpcap
+    from scapy.all import wrpcap, Ether
     from scapy.layers.dot1q import Dot1Q
     SCAPY_AVAILABLE = True
 except ImportError:
     SCAPY_AVAILABLE = False
-    print("Warning: Scapy not available. PCAP features will be limited.")
+    logger.warning("Scapy not available. PCAP features will be limited.")
 
 from config import settings
 from database import SessionLocal
-from models.models import Alert
 
 # AF_PACKET constants for Linux raw sockets
 if hasattr(socket, 'AF_PACKET'):
@@ -36,14 +37,18 @@ else:
 class PacketCaptureService:
     """Service for advanced packet capture and fingerprinting"""
     
-    def __init__(self, capture_dir: str = "/var/lib/ddos-protection/pcaps"):
+    def __init__(self, capture_dir: Optional[str] = None):
         """
         Initialize packet capture service
         
         Args:
-            capture_dir: Directory to store PCAP files
+            capture_dir: Directory to store PCAP files. If not provided,
+                defaults to settings.PCAP_DIR, with a fallback to the
+                legacy path "/var/lib/ddos-protection/pcaps".
         """
-        self.capture_dir = Path(capture_dir)
+        default_capture_dir = getattr(settings, "PCAP_DIR", "/var/lib/ddos-protection/pcaps")
+        effective_capture_dir = capture_dir or default_capture_dir
+        self.capture_dir = Path(effective_capture_dir)
         self.capture_dir.mkdir(parents=True, exist_ok=True)
         
         self.redis_client = redis.Redis(
@@ -62,9 +67,9 @@ class PacketCaptureService:
         self.max_packets_per_file = getattr(settings, 'PCAP_MAX_PACKETS', 10000)
         self.vlan_untagging_enabled = getattr(settings, 'VLAN_UNTAGGING_ENABLED', True)
         
-        print(f"PacketCaptureService initialized. PCAP directory: {self.capture_dir}")
+        logger.info(f"PacketCaptureService initialized. PCAP directory: {self.capture_dir}")
         if not SCAPY_AVAILABLE:
-            print("WARNING: Scapy not available. PCAP features will be limited.")
+            logger.warning("Scapy not available. PCAP features will be limited.")
     
     def untag_vlan(self, packet_data: bytes) -> bytes:
         """
@@ -123,8 +128,8 @@ class PacketCaptureService:
         
         def capture_worker():
             try:
-                print(f"Starting PCAP capture on {interface} for {duration}s")
-                print(f"Filter: {filter_bpf if filter_bpf else 'none'}")
+                logger.info(f"Starting PCAP capture on {interface} for {duration}s")
+                logger.info(f"Filter: {filter_bpf if filter_bpf else 'none'}")
                 
                 packets = sniff(
                     iface=interface,
@@ -137,11 +142,10 @@ class PacketCaptureService:
                 if self.vlan_untagging_enabled:
                     cleaned_packets = []
                     for pkt in packets:
-                        if pkt.haslayer(Dot1Q):
-                            # Remove VLAN layer and use payload
-                            cleaned_packets.append(pkt[Dot1Q].payload)
-                        else:
-                            cleaned_packets.append(pkt)
+                        # Remove all stacked VLAN layers (handles 802.1Q and 802.1ad)
+                        while pkt.haslayer(Dot1Q):
+                            pkt = pkt[Dot1Q].payload
+                        cleaned_packets.append(pkt)
                     packets = cleaned_packets
                 
                 wrpcap(str(pcap_file), packets)
@@ -295,7 +299,7 @@ class PacketCaptureService:
             if SCAPY_AVAILABLE:
                 from scapy.all import sniff
                 
-                print(f"Capturing attack fingerprint for {attack_type} on {target_ip}")
+                logger.info(f"Capturing attack fingerprint for {attack_type} on {target_ip}")
                 
                 packets = sniff(
                     filter=filter_bpf,
@@ -303,17 +307,18 @@ class PacketCaptureService:
                     count=self.max_packets_per_file
                 )
                 
-                # Apply VLAN untagging
+                # Apply VLAN untagging - remove all stacked VLAN layers
                 if self.vlan_untagging_enabled:
                     cleaned_packets = []
                     for pkt in packets:
-                        if pkt.haslayer(Dot1Q):
+                        # Remove all stacked VLAN layers (handles 802.1Q and 802.1ad)
+                        while pkt.haslayer(Dot1Q):
                             pkt = pkt[Dot1Q].payload
                         cleaned_packets.append(pkt)
                     packets = cleaned_packets
                 
                 wrpcap(str(pcap_file), packets)
-                print(f"Captured attack fingerprint: {len(packets)} packets -> {pcap_file}")
+                logger.info(f"Captured attack fingerprint: {len(packets)} packets -> {pcap_file}")
                 
                 # Store metadata in Redis
                 metadata = {
@@ -332,7 +337,7 @@ class PacketCaptureService:
                 
                 return str(pcap_file)
             else:
-                print("Scapy not available - cannot capture fingerprint")
+                logger.warning("Scapy not available - cannot capture fingerprint")
                 return None
                 
         except Exception as e:

@@ -5,6 +5,7 @@ import redis
 import time
 import json
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import List
 from collections import defaultdict, Counter
@@ -15,13 +16,15 @@ from models.models import Alert, TrafficLog
 from config import settings
 from services.notification_service import notify_alert
 
+logger = logging.getLogger(__name__)
+
 # Import new services
 try:
     from services.packet_capture import get_packet_capture_service
     from services.hostgroup_manager import get_hostgroup_manager
     PACKET_CAPTURE_AVAILABLE = True
 except ImportError as e:
-    print(f"Warning: Packet capture or hostgroup features not available: {e}")
+    logger.warning(f"Packet capture or hostgroup features not available: {e}")
     PACKET_CAPTURE_AVAILABLE = False
 
 class AnomalyDetector:

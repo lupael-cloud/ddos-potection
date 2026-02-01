@@ -2,8 +2,7 @@
 Unit tests for packet capture and hostgroup features
 """
 import pytest
-from unittest.mock import MagicMock, patch, mock_open
-import ipaddress
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
 from services.packet_capture import PacketCaptureService
