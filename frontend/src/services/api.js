@@ -70,6 +70,9 @@ export const mitigationService = {
   create: (mitigation) => api.post('/mitigation/', mitigation),
   execute: (id) => api.post(`/mitigation/${id}/execute`),
   stop: (id) => api.post(`/mitigation/${id}/stop`),
+  getActiveStatus: () => api.get('/mitigation/status/active'),
+  getHistory: (hours = 24) => api.get(`/mitigation/status/history?hours=${hours}`),
+  getAnalytics: () => api.get('/mitigation/status/analytics'),
 };
 
 // ISP endpoints
