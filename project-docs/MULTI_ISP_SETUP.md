@@ -366,7 +366,7 @@ pytest backend/tests/test_multi_isp_support.py --cov=backend/routers --cov-repor
 
 ## API Examples
 
-See the full API documentation in `docs/MULTI_ISP_FEATURES.md`
+See the full API documentation in `MULTI_ISP_FEATURES.md`
 
 ### Complete Workflow Example
 
@@ -430,7 +430,7 @@ with open("report.pdf", "wb") as f:
 ## Support
 
 For issues or questions:
-- Check the documentation: `docs/MULTI_ISP_FEATURES.md`
+- Check the documentation: `MULTI_ISP_FEATURES.md`
 - Review test cases: `backend/tests/test_multi_isp_support.py`
 - Open an issue on GitHub
 

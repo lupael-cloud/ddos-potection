@@ -20,6 +20,7 @@ Real-time traffic monitoring • Anomaly detection • Automated mitigation • 
 
 ## 📑 Table of Contents
 
+- [AI Agents — Read This First](#-ai-agents--read-this-first)
 - [Features](#-features)
 - [Screenshots](#-screenshots)
 - [Requirements](#-requirements)
@@ -468,7 +469,7 @@ GET /api/v1/mitigation/status/history
 GET /api/v1/mitigation/status/analytics
 ```
 
-For detailed monitoring setup and configuration, see [Monitoring Guide](docs/MONITORING.md).
+For detailed monitoring setup and configuration, see [Monitoring Guide](project-docs/MONITORING.md).
 
 ## 🧪 Testing
 
@@ -512,24 +513,60 @@ Our platform offers a **modern, open-source alternative** to commercial DDoS pro
 - Your network is under 100Gbps
 - You prefer modern web technologies and DevOps practices
 
-For a detailed feature-by-feature comparison, migration guide, and use case recommendations, see our **[FastNetMon Comparison Guide](docs/COMPARISON_FASTNETMON.md)**.
+For a detailed feature-by-feature comparison, migration guide, and use case recommendations, see our **[FastNetMon Comparison Guide](project-docs/COMPARISON_FASTNETMON.md)**.
+
+## 🤖 AI Agents — Read This First
+
+> **If you are an AI coding agent** (GitHub Copilot, Claude, GPT-4o, Cursor, Aider, or any
+> other AI tool): you **must** read
+> [`project-docs/AI_INSTRUCTIONS.md`](project-docs/AI_INSTRUCTIONS.md) before making any
+> changes to this repository. It contains mandatory rules, style guides, architecture
+> constraints, and the correct technical reference for every area of the codebase.
+>
+> Instruction files are also present at:
+> - [`AGENTS.md`](AGENTS.md) — OpenAI Codex / general agents
+> - [`CLAUDE.md`](CLAUDE.md) — Claude (Anthropic)
+> - [`.github/copilot-instructions.md`](.github/copilot-instructions.md) — GitHub Copilot
+
+---
 
 ## 📖 Documentation
 
-- [Quick Start Guide](QUICKSTART.md)
-- [Deployment Guide](docs/DEPLOYMENT.md)
-- [Development Guide](docs/DEVELOPMENT.md)
-- [Packet Capture & Thresholds Guide](docs/PACKET_CAPTURE.md) - PCAP, AF_PACKET, AF_XDP, VLAN untagging, and hostgroups
-- [Monitoring & Alerting Guide](docs/MONITORING.md) - Comprehensive guide for Prometheus, Grafana, and notifications
-- [BGP Blackholing (RTBH) Guide](docs/BGP-RTBH.md) - Setup and use BGP-based DDoS mitigation
-- [Traffic Collection Guide](docs/TRAFFIC_COLLECTION.md)
-- [FastNetMon Comparison](docs/COMPARISON_FASTNETMON.md) - Detailed comparison with FastNetMon Advanced Edition
-- [Security Documentation](SECURITY.md)
-- [Contributing Guidelines](CONTRIBUTING.md)
+All documentation lives in the **[`project-docs/`](project-docs/)** folder.
+See **[`project-docs/INDEX.md`](project-docs/INDEX.md)** for the full table of contents.
+
+### Planning & Status
+- [Project Overview](project-docs/OVERVIEW.md) — architecture, tech stack, service ports
+- [Status Report](project-docs/REPORT.md) — current implementation status & known issues
+- [Roadmap](project-docs/ROADMAP.md) — planned features by phase (Q2 2026 – Q2 2027)
+- [TODO](project-docs/TODO.md) — open tasks with file references and priorities
+- [Changelog](project-docs/CHANGELOG.md) — version history
+
+### Getting Started
+- [Quick Start Guide](project-docs/QUICKSTART.md) — running in under 10 minutes
+- [Deployment Guide](project-docs/DEPLOYMENT.md) — production deployment
+- [Development Guide](project-docs/DEVELOPMENT.md) — local dev setup & standards
+- [Contributing Guidelines](project-docs/CONTRIBUTING.md)
+
+### Feature Guides
+- [Traffic Collection Guide](project-docs/TRAFFIC_COLLECTION.md) — NetFlow/sFlow/IPFIX
+- [Packet Capture & Thresholds Guide](project-docs/PACKET_CAPTURE.md) — PCAP, AF_PACKET, AF_XDP, VLAN, hostgroups
+- [BGP Blackholing (RTBH) Guide](project-docs/BGP-RTBH.md) — BGP-based mitigation
+- [FlowSpec Guide](project-docs/FLOWSPEC.md) — FlowSpec announcements
+- [Custom Rules Guide](project-docs/CUSTOM-RULES.md) — rule engine
+- [Monitoring & Alerting Guide](project-docs/MONITORING.md) — Prometheus, Grafana, notifications
+- [Multi-ISP Setup Guide](project-docs/MULTI_ISP_SETUP.md) — multi-tenant configuration
+
+### Security
+- [Security Documentation](project-docs/SECURITY.md)
+- [Security Summary](project-docs/SECURITY_SUMMARY.md) — CodeQL analysis results
+
+### Comparison
+- [FastNetMon Comparison](project-docs/COMPARISON_FASTNETMON.md) — vs FastNetMon Advanced Edition
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guidelines](CONTRIBUTING.md) before submitting PRs.
+Contributions are welcome! Please read our [Contributing Guidelines](project-docs/CONTRIBUTING.md) before submitting PRs.
 
 1. Fork the repository
 2. Create your feature branch (`git checkout -b feature/AmazingFeature`)
@@ -545,7 +582,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 Need help? We're here for you!
 
-- 📖 [Documentation](docs/)
+- 📖 [Documentation](project-docs/INDEX.md)
 - 🐛 [GitHub Issues](https://github.com/i4edubd/ddos-potection/issues)
 - 💬 [Discussions](https://github.com/i4edubd/ddos-potection/discussions)
 - 📧 Email: support@ispbills.com
