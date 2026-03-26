@@ -24,6 +24,12 @@ from routers.webhook_router import router as webhook_router
 from routers.threat_intel_router import router as threat_intel_router
 from routers.totp_router import router as totp_router
 from routers.flow_source_router import router as flow_source_router
+from routers.customer_router import router as customer_router
+from routers.gdpr_router import router as gdpr_router
+from routers.audit_router import router as audit_router
+from routers.campaign_router import router as campaign_router
+from routers.forecast_router import router as forecast_router
+from routers.rpki_router import router as rpki_router
 from middleware.audit_middleware import AuditMiddleware
 from database import engine, Base, get_db
 from config import settings
@@ -78,6 +84,12 @@ app.include_router(webhook_router)
 app.include_router(threat_intel_router)
 app.include_router(totp_router, prefix="/api/v1/auth")
 app.include_router(flow_source_router)
+app.include_router(customer_router)
+app.include_router(gdpr_router)
+app.include_router(audit_router)
+app.include_router(campaign_router)
+app.include_router(forecast_router)
+app.include_router(rpki_router)
 
 @app.get("/")
 async def root():

@@ -103,17 +103,17 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
   - New files: `backend/services/webhook_service.py`, `backend/routers/webhook_router.py`
   - Register URLs for alert/mitigation events; exponential-backoff retry on failure.
 
-- [ ] **[RBAC] Customer self-service portal**
+- [x] **[RBAC] Customer self-service portal**
   - Add `customer` role to RBAC (read-only, scoped to their IP prefixes)
-  - New frontend pages: MyProtection, MyAlerts, MyReports, MySettings
+  - New router: `backend/routers/customer_router.py`; `CustomerSettings` model added.
 
 - [x] **[Compliance] Audit logging middleware**
   - New files: `backend/models/models.py` (AuditLog model), `backend/middleware/audit_middleware.py`
   - Auto-logs all POST/PUT/PATCH/DELETE API calls: who, what, old value, new value, IP.
 
-- [ ] **[HA] Horizontal Pod Autoscaler for Kubernetes**
-  - File: `kubernetes/`
-  - Add HPA for collector and API deployments based on CPU and custom flow-rate metric
+- [x] **[HA] Horizontal Pod Autoscaler for Kubernetes**
+  - File: `kubernetes/hpa.yaml`
+  - HPA for backend (2-10 replicas) and collector (2-20 replicas) on CPU/memory metrics.
 
 ---
 
@@ -126,9 +126,12 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
 - [ ] **[Mobile] React Native companion app**
 - [x] **[Integration] Netbox IPAM sync** (`backend/services/netbox_sync.py`)
 - [x] **[Integration] SNMP trap sender** for Zabbix/Nagios (`backend/services/snmp_sender.py`)
-- [ ] **[Analytics] Attack campaign tracking** across ISP tenants
-- [ ] **[Analytics] Traffic forecasting** (ARIMA/Prophet) for capacity planning
-- [ ] **[DevOps] Helm chart** for Kubernetes deployment
+- [x] **[Analytics] Attack campaign tracking** across ISP tenants
+  - `AttackCampaign` model; `services/campaign_tracker.py`; `routers/campaign_router.py`
+- [x] **[Analytics] Traffic forecasting** (rolling stats) for capacity planning
+  - `services/forecasting_service.py` with Redis-backed hourly stats; `routers/forecast_router.py`
+- [x] **[DevOps] Helm chart** for Kubernetes deployment
+  - Full chart in `kubernetes/helm/ddos-platform/` with HPA, ingress, configmap, secret templates.
 - [ ] **[DevOps] HashiCorp Vault** integration for secrets management
 
 ---

@@ -237,6 +237,17 @@ class Settings(BaseSettings):
     # Anomaly Detector Poll Interval (fallback when no Redis event received)
     DETECTOR_POLL_INTERVAL: int = 30      # seconds
 
+    # Redis Sentinel HA
+    REDIS_SENTINEL_ENABLED: bool = False
+    REDIS_SENTINEL_HOSTS: str = "localhost:26379"
+
+    # Traffic Forecasting
+    FORECAST_HISTORY_WEEKS: int = 4
+
+    # RPKI Validation
+    RPKI_VALIDATION_ENABLED: bool = True
+    RPKI_API_URL: str = "https://rpki.cloudflare.com/api/v1/validity"
+
     # ---------------------------------------------------------------------------
     # Sub-model instances – populated after all flat fields are validated.
     # External code may use settings.database.DATABASE_URL etc. as an alternative

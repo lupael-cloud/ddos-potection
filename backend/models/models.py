@@ -14,6 +14,12 @@ class ISP(Base):
     api_key = Column(String(255), unique=True, index=True)
     stripe_customer_id = Column(String(255), nullable=True)
     paypal_customer_id = Column(String(255), nullable=True)
+    # Whitelabel branding
+    brand_logo_url = Column(String(500), nullable=True)
+    brand_primary_color = Column(String(7), nullable=True)  # hex color e.g. "#1a73e8"
+    brand_company_name = Column(String(255), nullable=True)
+    brand_portal_domain = Column(String(255), nullable=True)
+    brand_support_email = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
@@ -219,4 +225,47 @@ class FlowSource(Base):
     source_ip = Column(String(45), nullable=False, index=True)  # Router IP
     description = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class CustomerSettings(Base):
+    __tablename__ = "customer_settings"
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, unique=True)
+    isp_id = Column(Integer, ForeignKey("isps.id"), nullable=False)
+    notification_email = Column(String(255), nullable=True)
+    webhook_url = Column(String(2048), nullable=True)
+    alert_threshold = Column(String(20), default="high")  # low, medium, high, critical
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class GDPRRetentionPolicy(Base):
+    __tablename__ = "gdpr_retention_policies"
+    id = Column(Integer, primary_key=True, index=True)
+    isp_id = Column(Integer, ForeignKey("isps.id"), nullable=False, unique=True)
+    traffic_logs_days = Column(Integer, default=90)
+    alerts_days = Column(Integer, default=365)
+    pcap_days = Column(Integer, default=30)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class AttackCampaign(Base):
+    """Groups related attacks over time into campaigns."""
+    __tablename__ = "attack_campaigns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    isp_id = Column(Integer, ForeignKey("isps.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    campaign_type = Column(String(50), nullable=True)  # volumetric, application, mixed
+    first_seen = Column(DateTime(timezone=True), server_default=func.now())
+    last_seen = Column(DateTime(timezone=True), nullable=True)
+    total_alerts = Column(Integer, default=0)
+    peak_pps = Column(Integer, default=0)
+    peak_bps = Column(Integer, default=0)
+    source_asns = Column(JSON, nullable=True)
+    target_prefixes = Column(JSON, nullable=True)
+    status = Column(String(20), default="active")  # active, resolved
+    notes = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())

@@ -286,3 +286,84 @@ async def get_dashboard_stats(
             for alert in recent_alerts
         ]
     }
+
+
+# ── Whitelabel Branding ──────────────────────────────────────────────────────
+
+class BrandingOut(BaseModel):
+    isp_id: int
+    brand_logo_url: Optional[str]
+    brand_primary_color: Optional[str]
+    brand_company_name: Optional[str]
+    brand_portal_domain: Optional[str]
+    brand_support_email: Optional[str]
+
+    class Config:
+        from_attributes = True
+
+
+class BrandingUpdate(BaseModel):
+    brand_logo_url: Optional[str] = None
+    brand_primary_color: Optional[str] = None  # hex e.g. "#1a73e8"
+    brand_company_name: Optional[str] = None
+    brand_portal_domain: Optional[str] = None
+    brand_support_email: Optional[str] = None
+
+
+@router.get("/{isp_id}/branding", response_model=BrandingOut)
+async def get_isp_branding(
+    isp_id: int,
+    db: Session = Depends(get_db),
+):
+    """Return whitelabel branding for the given ISP (public endpoint)."""
+    isp = db.query(ISP).filter(ISP.id == isp_id).first()
+    if not isp:
+        raise HTTPException(status_code=404, detail="ISP not found")
+    return BrandingOut(
+        isp_id=isp.id,
+        brand_logo_url=isp.brand_logo_url,
+        brand_primary_color=isp.brand_primary_color,
+        brand_company_name=isp.brand_company_name,
+        brand_portal_domain=isp.brand_portal_domain,
+        brand_support_email=isp.brand_support_email,
+    )
+
+
+@router.put("/{isp_id}/branding", response_model=BrandingOut)
+async def update_isp_branding(
+    isp_id: int,
+    payload: BrandingUpdate,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update whitelabel branding (admin only, own ISP only)."""
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    if current_user.isp_id != isp_id:
+        raise HTTPException(status_code=403, detail="Cannot modify another ISP's branding")
+
+    isp = db.query(ISP).filter(ISP.id == isp_id).first()
+    if not isp:
+        raise HTTPException(status_code=404, detail="ISP not found")
+
+    if payload.brand_logo_url is not None:
+        isp.brand_logo_url = payload.brand_logo_url
+    if payload.brand_primary_color is not None:
+        isp.brand_primary_color = payload.brand_primary_color
+    if payload.brand_company_name is not None:
+        isp.brand_company_name = payload.brand_company_name
+    if payload.brand_portal_domain is not None:
+        isp.brand_portal_domain = payload.brand_portal_domain
+    if payload.brand_support_email is not None:
+        isp.brand_support_email = payload.brand_support_email
+
+    db.commit()
+    db.refresh(isp)
+    return BrandingOut(
+        isp_id=isp.id,
+        brand_logo_url=isp.brand_logo_url,
+        brand_primary_color=isp.brand_primary_color,
+        brand_company_name=isp.brand_company_name,
+        brand_portal_domain=isp.brand_portal_domain,
+        brand_support_email=isp.brand_support_email,
+    )

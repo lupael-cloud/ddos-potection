@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Tasks 21–30: Customer Portal, GDPR, Audit Export, Branding, Campaigns, Redis HA, K8s HPA/Network-Policies, Helm, Forecasting, RPKI
+- **Task 21 — Customer Self-Service Portal**: `routers/customer_router.py` with `/my-protection`,
+  `/my-alerts`, `/my-reports`, `/my-settings` (GET/PUT). `CustomerSettings` model added.
+  All endpoints scoped to `isp_id` from the authenticated user.
+- **Task 22 — GDPR Data Governance**: `routers/gdpr_router.py` with retention policy CRUD,
+  right-to-erasure purge, subject-access-request JSON export. `GDPRRetentionPolicy` model added.
+  `services/retention_service.py` for background cleanup of expired data.
+- **Task 23 — Audit Log Export**: `routers/audit_router.py` with paginated listing and CSV
+  `StreamingResponse` export (admin only, filterable by user/path/method/date range).
+- **Task 24 — Whitelabel Branding**: Five branding columns added to `ISP` model
+  (`brand_logo_url`, `brand_primary_color`, `brand_company_name`, `brand_portal_domain`,
+  `brand_support_email`). `GET/PUT /{isp_id}/branding` endpoints added to `isp_router.py`.
+- **Task 25 — Attack Campaign Tracking**: `AttackCampaign` model; `services/campaign_tracker.py`
+  groups related alerts by ASN within 4-hour windows; `routers/campaign_router.py` with
+  list/get/update endpoints (isp_id scoped).
+- **Task 26 — Redis Sentinel HA**: `docker-compose.yml` refactored to `redis-master`,
+  `redis-replica`, `redis-sentinel` services; `docker/redis-sentinel.conf` created.
+  Config: `REDIS_SENTINEL_ENABLED`, `REDIS_SENTINEL_HOSTS`.
+- **Task 27 — Kubernetes HPA + NetworkPolicy**: `kubernetes/hpa.yaml` (backend 2-10 replicas,
+  collector 2-20 replicas); `kubernetes/network-policies.yaml` with default-deny-all plus
+  targeted allow policies for frontend→backend, backend→postgres/redis, collector UDP.
+- **Task 28 — Helm Chart**: Full chart in `kubernetes/helm/ddos-platform/` including
+  `Chart.yaml`, `values.yaml`, `_helpers.tpl`, configmap, secret, deployments (api+collector),
+  service, ingress, and HPA templates.
+- **Task 29 — Traffic Forecasting**: `services/forecasting_service.py` with per-prefix
+  per-hour-of-week rolling statistics in Redis; mean/std predictions, anomaly detection.
+  `routers/forecast_router.py` with `/capacity-risk` and `/{prefix:path}` endpoints.
+  Config: `FORECAST_HISTORY_WEEKS`.
+- **Task 30 — RPKI/ROA Validation**: `services/rpki_validator.py` validates BGP routes via
+  Cloudflare RPKI API; Redis-cached (1h TTL); bulk concurrent validation.
+  `routers/rpki_router.py` with `/validate/{asn}/{prefix:path}` and `/bulk-validate`.
+  Config: `RPKI_VALIDATION_ENABLED`, `RPKI_API_URL`.
+
 #### Tasks 11–20: Integration Services & Platform Features
 - **Task 11 — GeoIP MaxMind GeoLite2 Integration**: `services/geoip_service.py` with `GeoIPService`
   class; falls back to deterministic hash-based stub coordinates when DB unavailable.

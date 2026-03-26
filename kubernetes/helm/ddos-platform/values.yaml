@@ -1,0 +1,79 @@
+replicaCount:
+  api: 2
+  collector: 2
+
+image:
+  registry: your-registry
+  api:
+    repository: ddos-backend
+    tag: latest
+    pullPolicy: Always
+  collector:
+    repository: ddos-collector
+    tag: latest
+    pullPolicy: Always
+
+service:
+  api:
+    type: ClusterIP
+    port: 8000
+
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  host: ddos.yourdomain.com
+  tls: true
+  tlsSecretName: ddos-platform-tls
+
+config:
+  host: "0.0.0.0"
+  port: "8000"
+  debug: "False"
+  redisHost: "redis"
+  redisPort: "6379"
+  netflowPort: "2055"
+  sflowPort: "6343"
+  ipfixPort: "4739"
+  synFloodThreshold: "10000"
+  udpFloodThreshold: "50000"
+  entropyThreshold: "3.5"
+  autoMitigation: "True"
+
+secrets:
+  databaseUrl: "postgresql://ddos_user:ddos_pass@postgres:5432/ddos_platform"
+  secretKey: "CHANGE-THIS-SECRET-KEY-IN-PRODUCTION"
+  smtpPassword: ""
+  telegramBotToken: ""
+  stripeApiKey: ""
+
+hpa:
+  api:
+    minReplicas: 2
+    maxReplicas: 10
+    cpuUtilization: 70
+    memoryUtilization: 80
+  collector:
+    minReplicas: 2
+    maxReplicas: 20
+    cpuUtilization: 80
+
+resources:
+  api:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+  collector:
+    requests:
+      memory: "256Mi"
+      cpu: "250m"
+    limits:
+      memory: "1Gi"
+      cpu: "1000m"
+
+namespace: ddos-platform
