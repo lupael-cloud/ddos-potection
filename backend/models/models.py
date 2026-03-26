@@ -287,3 +287,18 @@ class Router(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class Signature(Base):
+    """BPF / FlowSpec attack signature stored in the database."""
+    __tablename__ = "signatures"
+
+    id = Column(Integer, primary_key=True, index=True)
+    isp_id = Column(Integer, ForeignKey("isps.id"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    attack_type = Column(String(100), nullable=False, index=True)
+    bpf_filter = Column(Text, nullable=True)
+    flowspec_rule = Column(Text, nullable=True)
+    confidence = Column(Numeric(4, 3), nullable=False, default=0.5)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

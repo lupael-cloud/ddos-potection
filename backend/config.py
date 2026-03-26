@@ -266,6 +266,22 @@ class Settings(BaseSettings):
     TLS_FLOW_CERTFILE: Optional[str] = None
     TLS_FLOW_KEYFILE: Optional[str] = None
 
+    # ServiceNow Integration
+    SERVICENOW_INSTANCE: str = ""
+    SERVICENOW_USERNAME: str = ""
+    SERVICENOW_PASSWORD: str = ""
+
+    # JIRA Integration
+    JIRA_BASE_URL: str = ""
+    JIRA_EMAIL: str = ""
+    JIRA_API_TOKEN: str = ""
+    JIRA_PROJECT_KEY: str = "DDOS"
+
+    # Zendesk Integration
+    ZENDESK_SUBDOMAIN: str = ""
+    ZENDESK_EMAIL: str = ""
+    ZENDESK_API_TOKEN: str = ""
+
     # ---------------------------------------------------------------------------
     # Sub-model instances – populated after all flat fields are validated.
     # External code may use settings.database.DATABASE_URL etc. as an alternative

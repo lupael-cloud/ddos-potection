@@ -132,6 +132,25 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
 - [x] **[DevOps] Helm chart** for Kubernetes deployment
   - Full chart in `kubernetes/helm/ddos-platform/` with HPA, ingress, configmap, secret templates.
 - [ ] **[DevOps] HashiCorp Vault** integration for secrets management
+- [x] **[Integration] ServiceNow / JIRA / Zendesk ticketing**
+  - `backend/services/ticketing_service.py`; `backend/routers/ticketing_router.py`
+  - Config: `SERVICENOW_*`, `JIRA_*`, `ZENDESK_*` settings.
+- [x] **[Branding] CSS variable injection (per-ISP)**
+  - `backend/routers/branding_router.py` — public CSS endpoint + CRUD + custom domain.
+  - `backend/services/custom_domain.py` — `CustomDomainManager`.
+- [x] **[Branding] Branded email templates**
+  - `backend/services/email_templates.py` — `BrandedEmailRenderer` (alert, report, welcome).
+- [x] **[Security] Botnet C2 fingerprinting**
+  - `backend/services/botnet_c2.py` — Mirai, Emotet, IRC, HTTP beacon indicators.
+- [x] **[Signatures] BPF / FlowSpec signature library**
+  - `backend/services/signature_library.py`; `backend/routers/signature_router.py`.
+  - `Signature` model added to `backend/models/models.py`.
+- [x] **[Risk] Daily attack-probability scoring per prefix**
+  - `backend/services/risk_scorer.py`; `backend/routers/risk_router.py`.
+- [x] **[BI] Business intelligence service (MRR, ROI, attack cost, KPIs)**
+  - `backend/services/business_intelligence.py`; partial of `backend/routers/bi_router.py`.
+- [x] **[Capacity] Monthly capacity projections**
+  - `backend/services/capacity_planner.py`; `GET /api/v1/bi/capacity-forecast`.
 
 ---
 

@@ -9,7 +9,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Phase 3 Mitigation & Routing Features
+#### Phase 4/6 Analytics, Integrations & Branding Features
+
+- **ServiceNow / JIRA / Zendesk Ticketing Integration** (`backend/services/ticketing_service.py`):
+  `ServiceNowClient`, `JIRAClient`, `ZendeskClient` classes. All I/O via `aiohttp`
+  with `try/except ImportError` fallback. Methods: `create_incident`, `update_incident`,
+  `close_incident`; `create_issue`, `update_issue`, `add_comment`; `create_ticket`,
+  `update_ticket`. Failures are logged but never raised.
+- **Ticketing Router** (`backend/routers/ticketing_router.py`):
+  `GET /api/v1/ticketing/config`, `POST /api/v1/ticketing/incident`,
+  `POST /api/v1/ticketing/close`. JWT required (admin/operator).
+- **Config settings** (`backend/config.py`):
+  Added `SERVICENOW_INSTANCE/USERNAME/PASSWORD`, `JIRA_BASE_URL/EMAIL/API_TOKEN/PROJECT_KEY`,
+  `ZENDESK_SUBDOMAIN/EMAIL/API_TOKEN` fields.
+- **CSS Variable Branding Router** (`backend/routers/branding_router.py`):
+  `GET /api/v1/branding/{isp_id}/css` (public, returns `text/css` with `:root` custom
+  properties), `GET /api/v1/branding/{isp_id}` (JWT), `PUT /api/v1/branding/{isp_id}`
+  (JWT, admin only), `POST /api/v1/branding/{isp_id}/domain`,
+  `GET /api/v1/branding/{isp_id}/domain/verify`.
+- **Branded Email Templates** (`backend/services/email_templates.py`):
+  `BrandedEmailRenderer` class with `render_alert_email`, `render_monthly_report_email`,
+  `render_welcome_email`. Pure f-string HTML, no third-party template libraries.
+- **Custom Domain Manager** (`backend/services/custom_domain.py`):
+  `CustomDomainManager` class with `validate_domain` (regex, no DNS/shell),
+  `set_domain`, `verify_cname` (stub), `get_domain_config`.
+- **Signature Library** (`backend/services/signature_library.py`):
+  `AttackSignature` dataclass and `SignatureLibrary` class. Methods:
+  `extract_bpf_from_alert`, `extract_flowspec_from_alert`, `add_signature`,
+  `search_signatures`, `export_signatures` (json/bpf/flowspec).
+- **Signature Router** (`backend/routers/signature_router.py`):
+  `GET /api/v1/signatures`, `POST /api/v1/signatures/extract`,
+  `GET /api/v1/signatures/{id}/bpf`, `GET /api/v1/signatures/{id}/flowspec`.
+- **Signature DB Model** (`backend/models/models.py`):
+  New `Signature` SQLAlchemy model (`signatures` table) with `isp_id`, `name`,
+  `attack_type`, `bpf_filter`, `flowspec_rule`, `confidence`, `is_active`.
+- **Botnet C2 Fingerprinter** (`backend/services/botnet_c2.py`):
+  `BotnetC2Fingerprinter` class with built-in C2 indicators (Mirai, Emotet, IRC, HTTP
+  beacon). Methods: `analyze_flow`, `get_c2_report`, `generate_c2_alert`.
+- **Risk Scorer** (`backend/services/risk_scorer.py`):
+  `RiskScorer` class. `calculate_prefix_risk` scores 0–100 from attack frequency,
+  recency, and threat-intel hits. `batch_score_prefixes`, `should_preempt`,
+  `get_preemptive_action`.
+- **Risk Router** (`backend/routers/risk_router.py`):
+  `GET /api/v1/risk/scores`, `GET /api/v1/risk/scores/{prefix}`,
+  `POST /api/v1/risk/preempt`.
+- **Business Intelligence Service** (`backend/services/business_intelligence.py`):
+  `BIService` with `calculate_mrr`, `calculate_attack_cost`, `calculate_roi`,
+  `get_executive_kpis`.
+- **Capacity Planner** (`backend/services/capacity_planner.py`):
+  `CapacityPlanner` with `project_traffic_growth` (linear regression),
+  `estimate_capacity_needs`, `generate_capacity_report`.
+- **BI Router** (`backend/routers/bi_router.py`):
+  `GET /api/v1/bi/mrr`, `GET /api/v1/bi/attack-cost/{alert_id}`, `GET /api/v1/bi/roi`,
+  `GET /api/v1/bi/kpi-dashboard`, `GET /api/v1/bi/capacity-forecast`.
+- **Test suite** (`backend/tests/test_phase4_6_analytics.py`):
+  47 tests covering all new services; all pass.
+
+
 - **Nokia SROS Router Driver** (`backend/services/router_drivers.py`):
   `NokiaSROSDriver` class with `connect`, `push_acl`, `withdraw_acl`, `get_status`
   methods. Uses Netmiko `nokia_sros` device type. Validates IPs with `ipaddress`.
