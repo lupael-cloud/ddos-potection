@@ -781,8 +781,8 @@ class MitigationService:
                 print(f"tc rate-limit error: Invalid IP/CIDR: {ip!r}")
                 return False
 
-            # Validate rate format: digits followed by /s, /ms, or /us
-            if not re.match(r'^\d+/[a-z]+$', rate):
+            # Validate rate format: only allow known tc rate suffixes (s, ms, us)
+            if not re.match(r'^\d+/(s|ms|us)$', rate):
                 print(f"tc rate-limit error: Invalid rate format: {rate!r}")
                 return False
 

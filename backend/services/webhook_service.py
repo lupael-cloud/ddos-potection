@@ -106,7 +106,7 @@ async def dispatch_event(isp_id: int, event: str, data: Dict[str, Any]) -> None:
     try:
         webhooks: List[Webhook] = db.query(Webhook).filter(
             Webhook.isp_id == isp_id,
-            Webhook.is_active == True,  # noqa: E712
+            Webhook.is_active.is_(True),
         ).all()
 
         targets = [w for w in webhooks if event in (w.events or [])]

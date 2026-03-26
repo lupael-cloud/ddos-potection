@@ -139,7 +139,7 @@ def list_webhooks(
 
     query = db.query(Webhook).filter(Webhook.isp_id == current_user.isp_id)
     if active_only:
-        query = query.filter(Webhook.is_active == True)  # noqa: E712
+        query = query.filter(Webhook.is_active.is_(True))
     return query.order_by(Webhook.id).all()
 
 
