@@ -203,6 +203,16 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
 - [x] GCP VPC Flow Log ingestion (GCPFlowParser; cloud_flow_router)
 - [x] TLS-wrapped NetFlow receiver (TLSFlowReceiver; asyncio + ssl; config flags)
 - [x] Phase 2 test suite (31 unit tests in test_phase2_detection.py)
+- [x] Nokia SROS router driver (NokiaSROSDriver; netmiko nokia_sros; push_acl, withdraw_acl)
+- [x] Router Inventory model + API (Router model; /api/v1/routers/ CRUD + test-connection)
+- [x] Scrubbing Centre diversion (ScrubbingCentre + ScrubbingCentreManager; BGP /32 anycast)
+- [x] Scrubbing Centre API (/api/v1/scrubbing/ divert + return + centres)
+- [x] Third-party scrubbing providers (CloudflareProvider, LumenProvider, NSFOCUSProvider)
+- [x] Cooldown de-mitigation (CooldownManager; Redis-backed with in-process fallback)
+- [x] Intelligent mitigation selection (MitigationSelector; ATTACK_TYPE_MATRIX; AutoEscalationManager)
+- [x] Tier-based SLA targets (SLA_TIERS; SLAComplianceChecker; monthly report + breach credits)
+- [x] SLA Compliance API (/api/v1/sla/compliance/ tiers + monthly)
+- [x] Phase 3 test suite (63 unit tests in test_phase3_mitigation.py)
 
 ---
 

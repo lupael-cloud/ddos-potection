@@ -32,6 +32,9 @@ from routers.forecast_router import router as forecast_router
 from routers.rpki_router import router as rpki_router
 from routers.lstm_router import router as lstm_router
 from routers.cloud_flow_router import router as cloud_flow_router
+from routers.router_inventory_router import router as router_inventory_router
+from routers.scrubbing_router import router as scrubbing_router
+from routers.sla_compliance_router import router as sla_compliance_router
 from middleware.audit_middleware import AuditMiddleware
 from database import engine, Base, get_db
 from config import settings
@@ -94,6 +97,9 @@ app.include_router(forecast_router)
 app.include_router(rpki_router)
 app.include_router(lstm_router)
 app.include_router(cloud_flow_router)
+app.include_router(router_inventory_router)
+app.include_router(scrubbing_router)
+app.include_router(sla_compliance_router)
 
 @app.get("/")
 async def root():

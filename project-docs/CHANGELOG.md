@@ -9,6 +9,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Phase 3 Mitigation & Routing Features
+- **Nokia SROS Router Driver** (`backend/services/router_drivers.py`):
+  `NokiaSROSDriver` class with `connect`, `push_acl`, `withdraw_acl`, `get_status`
+  methods. Uses Netmiko `nokia_sros` device type. Validates IPs with `ipaddress`.
+  Registered in `RouterACLService` under keys `nokia` and `nokia_sros`.
+- **Router Inventory Model** (`backend/models/models.py`):
+  New `Router` SQLAlchemy model (`routers` table) with `isp_id`, `name`, `vendor`,
+  `ip_address`, `port`, `username`, `encrypted_password`, `role`, `is_active`.
+- **Router Inventory API** (`backend/routers/router_inventory_router.py`):
+  `GET/POST /api/v1/routers`, `PUT/DELETE /api/v1/routers/{id}`,
+  `POST /api/v1/routers/{id}/test-connection`. All queries filtered by `isp_id`.
+  `encrypted_password` never returned in responses.
+- **Scrubbing Centre Diversion** (`backend/services/scrubbing_centre.py`):
+  `ScrubbingCentre` class with `divert_traffic`, `return_traffic`, `get_utilization`.
+  `ScrubbingCentreManager` with `select_centre` (lowest-utilization anycast),
+  `divert`, and `return_all`. All IPs validated with `ipaddress`.
+- **Scrubbing Centre API** (`backend/routers/scrubbing_router.py`):
+  `GET /api/v1/scrubbing/centres`, `POST /api/v1/scrubbing/divert`,
+  `POST /api/v1/scrubbing/return`. JWT auth required (admin/operator).
+- **Third-Party Scrubbing Providers** (`backend/services/scrubbing_providers.py`):
+  `CloudflareProvider`, `LumenProvider`, `NSFOCUSProvider` with `activate_protection`
+  and `deactivate_protection` stub implementations. `ScrubProvider` registry dict.
+- **Cooldown De-mitigation** (`backend/services/mitigation_service.py`):
+  `CooldownManager` class with `start_cooldown`, `is_in_cooldown`, `cancel_cooldown`,
+  `get_remaining_secs`. Redis-backed with in-process dict fallback.
+- **Intelligent Mitigation Selection** (`backend/services/mitigation_selector.py`):
+  `MitigationSelector` with `ATTACK_TYPE_MATRIX` covering syn_flood, udp_flood,
+  dns_amplification, ntp_amplification, memcached, http_flood, and default.
+  `AutoEscalationManager` with Redis-backed attempt tracking and timeout-based escalation.
+- **Tier-Based SLA Targets** (`backend/services/sla_service.py`):
+  `SLA_TIERS` dict for standard/pro/enterprise. `SLAComplianceChecker` with
+  `check_ttd`, `check_ttm`, `calculate_breach_credit`, `generate_monthly_report`.
+- **SLA Compliance API** (`backend/routers/sla_compliance_router.py`):
+  `GET /api/v1/sla/compliance/tiers`, `GET /api/v1/sla/compliance/monthly`.
+  JWT auth required.
+- **Config additions** (`backend/config.py`):
+  `MITIGATION_COOLDOWN_SECS`, `CLOUDFLARE_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
+  `SCRUBBING_ENABLED`, `SCRUBBING_CENTRES`.
+- **Phase 3 tests** (`backend/tests/test_phase3_mitigation.py`):
+  63 unit tests covering all new services and classes.
+
 #### Phase 2 Detection Features
 - **Shadow Mode for ML detectors** (`backend/config.py`, `backend/services/anomaly_detector.py`):
   New `SHADOW_MODE: bool = False` config flag. When enabled, ML-based detectors

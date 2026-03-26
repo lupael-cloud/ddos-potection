@@ -122,6 +122,7 @@ class Settings(BaseSettings):
     # Mitigation
     AUTO_MITIGATION: bool = True
     MITIGATION_DURATION: int = 300  # seconds
+    MITIGATION_COOLDOWN_SECS: int = 300  # cooldown before de-mitigation
     
     # Alerts
     SMTP_HOST: str = "smtp.gmail.com"
@@ -250,6 +251,14 @@ class Settings(BaseSettings):
 
     # Shadow Mode – ML detectors emit tagged alerts but skip mitigation
     SHADOW_MODE: bool = False
+
+    # Cloudflare Magic Transit
+    CLOUDFLARE_API_TOKEN: str = ""
+    CLOUDFLARE_ACCOUNT_ID: str = ""
+
+    # Scrubbing Centre
+    SCRUBBING_ENABLED: bool = False
+    SCRUBBING_CENTRES: str = ""  # JSON array of centre config objects
 
     # TLS-wrapped NetFlow receiver
     TLS_FLOW_ENABLED: bool = False
