@@ -93,7 +93,7 @@ Enhancement suggestions are tracked as GitHub issues. Create an issue and provid
 
 ### Setting Up Development Environment
 
-See [DEVELOPMENT.md](docs/DEVELOPMENT.md) for detailed setup instructions.
+See [DEVELOPMENT.md](DEVELOPMENT.md) for detailed setup instructions.
 
 ### Coding Standards
 
@@ -213,8 +213,8 @@ Update documentation when:
 Documentation locations:
 - `README.md`: Project overview
 - `QUICKSTART.md`: Quick start guide
-- `docs/DEPLOYMENT.md`: Deployment instructions
-- `docs/DEVELOPMENT.md`: Development guide
+- `DEPLOYMENT.md`: Deployment instructions
+- `DEVELOPMENT.md`: Development guide
 - `CHANGELOG.md`: Version history
 - Code comments: Inline documentation
 

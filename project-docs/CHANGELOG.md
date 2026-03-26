@@ -5,6 +5,14 @@ All notable changes to the DDoS Protection Platform will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.0.2] - 2026-03-25
+
+### Security
+- **HIGH**: Updated `python-jose[cryptography]` from 3.3.0 to 3.4.0 to fix algorithm confusion
+  vulnerability with OpenSSH ECDSA keys (affected versions < 3.4.0)
+- **HIGH**: Updated `axios` from ^1.6.5 to ^1.13.5 (resolved 1.13.6) to fix Denial of Service
+  vulnerability via `__proto__` key in `mergeConfig` (affected versions >= 1.0.0, <= 1.13.4)
+
 ## [1.0.1] - 2024-01-31
 
 ### Security
@@ -136,4 +144,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on how to contribute to th
 For questions and support:
 - GitHub Issues: https://github.com/i4edubd/ddos-potection/issues
 - Documentation: See docs/ folder
-- Email: support@example.com
+- Email: support@ispbills.com

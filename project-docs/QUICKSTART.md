@@ -164,7 +164,7 @@ For advanced DDoS mitigation using BGP-based traffic dropping:
 2. **See complete BGP setup guide**:
    ```bash
    # Read the comprehensive BGP documentation
-   cat docs/BGP-RTBH.md
+   cat BGP-RTBH.md
    ```
 
 3. **Quick BGP Setup** (ExaBGP example):
@@ -172,8 +172,8 @@ For advanced DDoS mitigation using BGP-based traffic dropping:
    # Install ExaBGP
    pip3 install exabgp
    
-   # Configure ExaBGP (see docs/BGP-RTBH.md for the example config)
-   # Create /etc/exabgp/exabgp.conf based on the example in docs/BGP-RTBH.md
+   # Configure ExaBGP (see BGP-RTBH.md for the example config)
+   # Create /etc/exabgp/exabgp.conf based on the example in BGP-RTBH.md
    
    # Enable in platform
    echo "BGP_ENABLED=true" >> backend/.env
@@ -190,7 +190,7 @@ For advanced DDoS mitigation using BGP-based traffic dropping:
      --ip 192.0.2.100 --alert-id 1 --duration 60
    ```
 
-For complete BGP setup instructions, see [BGP-RTBH.md](docs/BGP-RTBH.md).
+For complete BGP setup instructions, see [BGP-RTBH.md](BGP-RTBH.md).
 
 ## Troubleshooting
 
@@ -263,12 +263,12 @@ For production deployment:
 
 1. **Change default passwords**
 2. **Use strong SECRET_KEY** in backend/.env
-3. **Enable SSL/TLS** (see docs/DEPLOYMENT.md)
+3. **Enable SSL/TLS** (see DEPLOYMENT.md)
 4. **Configure firewall** rules
-5. **Set up backups** (see docs/DEPLOYMENT.md)
+5. **Set up backups** (see DEPLOYMENT.md)
 6. **Update ALLOWED_ORIGINS** for CORS
 
-See `docs/DEPLOYMENT.md` for complete production setup guide.
+See `DEPLOYMENT.md` for complete production setup guide.
 
 ## What's Next?
 
