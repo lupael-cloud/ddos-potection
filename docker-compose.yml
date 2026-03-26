@@ -21,10 +21,10 @@ services:
       timeout: 5s
       retries: 5
 
-  # Redis
-  redis:
+  # Redis HA (master + replica + sentinel)
+  redis-master:
     image: redis:7-alpine
-    container_name: ddos-redis
+    container_name: ddos-redis-master
     ports:
       - "6379:6379"
     networks:
@@ -35,6 +35,35 @@ services:
       timeout: 5s
       retries: 5
 
+  redis-replica:
+    image: redis:7-alpine
+    container_name: ddos-redis-replica
+    command: redis-server --replicaof redis-master 6379
+    networks:
+      - ddos-network
+    depends_on:
+      redis-master:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis-sentinel:
+    image: redis:7-alpine
+    container_name: ddos-redis-sentinel
+    command: redis-sentinel /etc/redis/sentinel.conf
+    volumes:
+      - ./docker/redis-sentinel.conf:/etc/redis/sentinel.conf
+    ports:
+      - "26379:26379"
+    networks:
+      - ddos-network
+    depends_on:
+      redis-master:
+        condition: service_healthy
+
   # Backend API
   backend:
     build:
@@ -43,7 +72,7 @@ services:
     container_name: ddos-backend
     environment:
       DATABASE_URL: postgresql://ddos_user:ddos_pass@postgres:5432/ddos_platform
-      REDIS_HOST: redis
+      REDIS_HOST: redis-master
       REDIS_PORT: 6379
       HOST: 0.0.0.0
       PORT: 8000
@@ -52,7 +81,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      redis-master:
         condition: service_healthy
     networks:
       - ddos-network
@@ -68,7 +97,7 @@ services:
     container_name: ddos-collector
     environment:
       DATABASE_URL: postgresql://ddos_user:ddos_pass@postgres:5432/ddos_platform
-      REDIS_HOST: redis
+      REDIS_HOST: redis-master
       REDIS_PORT: 6379
     ports:
       - "2055:2055/udp"  # NetFlow
@@ -77,7 +106,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      redis-master:
         condition: service_healthy
     networks:
       - ddos-network
@@ -93,12 +122,12 @@ services:
     container_name: ddos-detector
     environment:
       DATABASE_URL: postgresql://ddos_user:ddos_pass@postgres:5432/ddos_platform
-      REDIS_HOST: redis
+      REDIS_HOST: redis-master
       REDIS_PORT: 6379
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      redis-master:
         condition: service_healthy
     networks:
       - ddos-network

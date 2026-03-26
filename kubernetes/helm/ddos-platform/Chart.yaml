@@ -1,0 +1,13 @@
+apiVersion: v2
+name: ddos-platform
+description: Enterprise-grade DDoS protection platform for ISPs
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - ddos
+  - protection
+  - security
+  - networking
+maintainers:
+  - name: DDoS Platform Team

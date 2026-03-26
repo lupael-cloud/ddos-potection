@@ -468,6 +468,25 @@ class TrafficCollector:
             
         except Exception as e:
             print(f"Error publishing to Redis stream: {e}")
+
+    def publish_to_kafka(self, flow: Dict[str, Any]) -> None:
+        """Publish flow to Kafka if enabled, otherwise fall back to Redis Streams."""
+        if settings.KAFKA_ENABLED:
+            try:
+                from services.kafka_consumer import KafkaFlowProducer
+                import asyncio
+                # Reuse a module-level producer singleton to avoid per-call setup overhead
+                producer = _get_kafka_producer()
+                loop = asyncio.new_event_loop()
+                try:
+                    loop.run_until_complete(producer.start())
+                    loop.run_until_complete(producer.publish_flow(flow))
+                finally:
+                    loop.close()
+                return
+            except Exception as exc:
+                print(f"Kafka publish failed, falling back to Redis: {exc}")
+        self.publish_to_redis_stream(flow)
     
     def store_traffic(self, flow: Dict[str, Any], isp_id: int = 1):
         """
@@ -663,9 +682,108 @@ class TrafficCollector:
         # Keep main thread alive
         netflow_thread.join()
 
+
+# Module-level Kafka producer singleton (lazy-initialised)
+_kafka_producer_instance = None
+
+
+def _get_kafka_producer():
+    """Return a reusable KafkaFlowProducer singleton."""
+    global _kafka_producer_instance
+    if _kafka_producer_instance is None:
+        from services.kafka_consumer import KafkaFlowProducer
+        _kafka_producer_instance = KafkaFlowProducer()
+    return _kafka_producer_instance
+
+
 def main():
     collector = TrafficCollector()
     collector.start_all_collectors()
 
 if __name__ == "__main__":
     main()
+
+
+# ---------------------------------------------------------------------------
+# SO_REUSEPORT multi-process collector
+# ---------------------------------------------------------------------------
+
+import multiprocessing
+import socket as _socket
+
+
+def create_reuseport_socket(port: int, host: str = "0.0.0.0") -> _socket.socket:
+    """Create a UDP socket bound to *host*:*port* with SO_REUSEPORT enabled.
+
+    Multiple processes may each call this function with the same address;
+    the kernel will load-balance incoming datagrams across them.
+
+    Binding to all interfaces (0.0.0.0) is intentional: the collector must
+    receive NetFlow/sFlow/IPFIX datagrams from multiple upstream routers on
+    different network interfaces.  Access is secured by Docker network
+    isolation and firewall rules at the host level.
+    """
+    sock = _socket.socket(_socket.AF_INET, _socket.SOCK_DGRAM)
+    sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEADDR, 1)
+    if hasattr(_socket, "SO_REUSEPORT"):
+        sock.setsockopt(_socket.SOL_SOCKET, _socket.SO_REUSEPORT, 1)
+    sock.bind((host, port))
+    return sock
+
+
+def _worker_loop(port: int, host: str, isp_id: int) -> None:
+    """Worker process: bind a SO_REUSEPORT socket and run the parse/store loop."""
+    collector = TrafficCollector()
+    sock = create_reuseport_socket(port, host)
+    print(f"[worker pid={multiprocessing.current_process().pid}] "
+          f"listening on {host}:{port} (SO_REUSEPORT)")
+    while True:
+        try:
+            data, addr = sock.recvfrom(65535)
+            if len(data) >= 2:
+                version = struct.unpack("!H", data[:2])[0]
+                if version == 5:
+                    flows_data = collector.parse_netflow_v5(data)
+                elif version == 9:
+                    flows_data = collector.parse_netflow_v9(data, addr[0])
+                else:
+                    continue
+                for flow in flows_data.get("flows", []):
+                    collector.store_traffic(flow, isp_id=isp_id)
+        except Exception as e:
+            print(f"[worker] error processing packet: {e}")
+
+
+class MultiProcessCollector:
+    """Spawn *num_workers* processes each sharing a UDP port via SO_REUSEPORT."""
+
+    def __init__(self, num_workers: int = 4, port: int = 2055,
+                 host: str = "0.0.0.0", isp_id: int = 1) -> None:
+        self.num_workers = num_workers
+        self.port = port
+        self.host = host
+        self.isp_id = isp_id
+        self._processes: list[multiprocessing.Process] = []
+
+    def start(self) -> None:
+        """Spawn all worker processes."""
+        for _ in range(self.num_workers):
+            p = multiprocessing.Process(
+                target=_worker_loop,
+                args=(self.port, self.host, self.isp_id),
+                daemon=True,
+            )
+            p.start()
+            self._processes.append(p)
+        print(f"MultiProcessCollector: {self.num_workers} workers on {self.host}:{self.port}")
+
+    def stop(self) -> None:
+        """Terminate all worker processes."""
+        for p in self._processes:
+            if p.is_alive():
+                p.terminate()
+        for p in self._processes:
+            p.join(timeout=5)
+        self._processes.clear()
+        print("MultiProcessCollector: all workers stopped")
+
