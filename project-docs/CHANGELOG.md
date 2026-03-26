@@ -9,6 +9,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+#### Phase 2 Detection Features
+- **Shadow Mode for ML detectors** (`backend/config.py`, `backend/services/anomaly_detector.py`):
+  New `SHADOW_MODE: bool = False` config flag. When enabled, ML-based detectors
+  (`detect_entropy_anomaly` via new `create_ml_alert` wrapper) tag alerts with
+  `{"shadow": true}` in Redis payloads and skip mitigation/notifications/PCAP capture.
+- **Threat Score service** (`backend/services/threat_score.py`):
+  `ThreatScorer.calculate_score(alert_data)` computes a 0–100 integer score from
+  bad-actor feed hit (+40), RPKI invalid (+20), geo-blocked region (+20), and
+  ML confidence ≥ 0.7 (+20). `get_threat_score(alert_data, redis_client)` adds a
+  `SISMEMBER` check against the `threat_intel:bad_actors` Redis SET.
+- **LSTM Attack Predictor** (`backend/services/lstm_predictor.py`):
+  `LSTMPredictor` class backed by `GradientBoostingClassifier` (sklearn).
+  `prepare_features`, `train`, `predict`, `save_model`, `load_model` methods.
+  Graceful stub fallback when sklearn is not installed.
+- **LSTM Router** (`backend/routers/lstm_router.py`):
+  `GET /api/v1/ml/lstm/status`, `POST /api/v1/ml/lstm/predict`. JWT required.
+- **GRE Decapsulation service** (`backend/services/gre_decap.py`):
+  `GREDecapsulator` supports RFC 2784 (standard) and RFC 2890 (key/sequence).
+  Methods: `is_gre_packet`, `parse_gre_header`, `decapsulate`.
+- **Cloud VPC Flow Ingestion** (`backend/services/cloud_flow_ingestion.py`):
+  `AWSVPCFlowParser.parse_line` / `parse_file` for AWS VPC Flow Log v2 text format.
+  `GCPFlowParser.parse_record` for GCP VPC Flow Log JSON records.
+- **Cloud Flow Router** (`backend/routers/cloud_flow_router.py`):
+  `POST /api/v1/cloud-flows/aws/upload` (multipart file),
+  `POST /api/v1/cloud-flows/gcp/upload` (JSON body). JWT required. ISP-scoped.
+- **TLS Flow Receiver** (`backend/services/tls_flow_receiver.py`):
+  `TLSFlowReceiver` asyncio TLS TCP server for encrypted NetFlow/IPFIX streams.
+  `create_ssl_context` supports optional mutual TLS (cafile). New config keys:
+  `TLS_FLOW_ENABLED`, `TLS_FLOW_PORT`, `TLS_FLOW_CERTFILE`, `TLS_FLOW_KEYFILE`.
+- **Phase 2 tests** (`backend/tests/test_phase2_detection.py`):
+  31 unit tests covering all new services and shadow-mode behaviour.
+
+
+
 #### Tasks 1–10: Foundation, Detection, ML Baselines
 - **Task 1 — Alembic Migrations**: `backend/alembic.ini`, `backend/alembic/env.py`,
   `backend/alembic/script.py.mako`, `backend/alembic/versions/001_initial_schema.py`.

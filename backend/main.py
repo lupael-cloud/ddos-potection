@@ -30,6 +30,8 @@ from routers.audit_router import router as audit_router
 from routers.campaign_router import router as campaign_router
 from routers.forecast_router import router as forecast_router
 from routers.rpki_router import router as rpki_router
+from routers.lstm_router import router as lstm_router
+from routers.cloud_flow_router import router as cloud_flow_router
 from middleware.audit_middleware import AuditMiddleware
 from database import engine, Base, get_db
 from config import settings
@@ -90,6 +92,8 @@ app.include_router(audit_router)
 app.include_router(campaign_router)
 app.include_router(forecast_router)
 app.include_router(rpki_router)
+app.include_router(lstm_router)
+app.include_router(cloud_flow_router)
 
 @app.get("/")
 async def root():

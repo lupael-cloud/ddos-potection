@@ -195,6 +195,14 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
 - [x] SLA tracking (SLARecord model + /api/v1/sla/ router)
 - [x] Audit logging middleware (AuditLog model + AuditMiddleware)
 - [x] Webhook system with HMAC-SHA256 signatures (/api/v1/webhooks/ router)
+- [x] Shadow Mode for ML detectors (SHADOW_MODE config flag; create_ml_alert wrapper)
+- [x] Threat Score service (ThreatScorer; get_threat_score with Redis bad-actor feed check)
+- [x] LSTM Attack Predictor (GradientBoostingClassifier approximation; lstm_router)
+- [x] GRE Decapsulation service (RFC 2784 + RFC 2890; GREDecapsulator)
+- [x] AWS VPC Flow Log ingestion (AWSVPCFlowParser; cloud_flow_router)
+- [x] GCP VPC Flow Log ingestion (GCPFlowParser; cloud_flow_router)
+- [x] TLS-wrapped NetFlow receiver (TLSFlowReceiver; asyncio + ssl; config flags)
+- [x] Phase 2 test suite (31 unit tests in test_phase2_detection.py)
 
 ---
 

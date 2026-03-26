@@ -248,6 +248,15 @@ class Settings(BaseSettings):
     RPKI_VALIDATION_ENABLED: bool = True
     RPKI_API_URL: str = "https://rpki.cloudflare.com/api/v1/validity"
 
+    # Shadow Mode – ML detectors emit tagged alerts but skip mitigation
+    SHADOW_MODE: bool = False
+
+    # TLS-wrapped NetFlow receiver
+    TLS_FLOW_ENABLED: bool = False
+    TLS_FLOW_PORT: int = 2056
+    TLS_FLOW_CERTFILE: str = ""
+    TLS_FLOW_KEYFILE: str = ""
+
     # ---------------------------------------------------------------------------
     # Sub-model instances – populated after all flat fields are validated.
     # External code may use settings.database.DATABASE_URL etc. as an alternative
