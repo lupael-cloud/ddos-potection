@@ -40,7 +40,8 @@ class ForecastingService:
             self._redis.rpush(key, value)
             self._redis.ltrim(key, -max_entries, -1)
 
-    def forecast_next_hour(self, prefix: str, current_hour_of_week: int) -> dict:        """
+    def forecast_next_hour(self, prefix: str, current_hour_of_week: int) -> dict:
+        """
         Predict traffic for the next hour using rolling mean/std
         of the same hour-of-week from historical data.
         """
