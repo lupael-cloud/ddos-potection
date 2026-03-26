@@ -9,7 +9,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-#### Phase 4/6 Analytics, Integrations & Branding Features
+#### Phase 7 / DevOps / Infrastructure Features
+- **PostgreSQL PITR Backup Script** (`scripts/pg_backup.sh`):
+  `--full` (pg_basebackup → S3/MinIO) and `--wal-archive` modes. Configurable via
+  `PGHOST`, `PGPORT`, `PGUSER`, `BACKUP_BUCKET`, `BACKUP_PREFIX`, `S3_ENDPOINT_URL`.
+  Uses `set -euo pipefail`; no shell injection.
+- **TimescaleDB Docker Compose Override** (`docker/timescaledb/docker-compose.timescale.yml`):
+  Replaces default `postgres` service with `timescale/timescaledb:latest-pg15`.
+- **TimescaleDB Config Helper** (`backend/services/timescale_config.py`):
+  `TimescaleDBSetup` with `setup_hypertable`, `add_retention_policy`,
+  `add_compression_policy`, `create_continuous_aggregate`. Uses `sqlalchemy.text()` for
+  all raw SQL; no user-input interpolation.
+- **Kubernetes Pod Disruption Budgets** (`kubernetes/pdb.yaml`):
+  `PodDisruptionBudget` for `ddos-backend` (minAvailable: 1) and `ddos-collector`
+  (minAvailable: 2) to ensure zero-downtime rolling updates.
+- **Kubernetes External Secrets** (`kubernetes/external-secrets.yaml`,
+  `kubernetes/vault-secret-store.yaml`):
+  `ExternalSecret` CRDs for DB, Redis, and app secrets sourced from HashiCorp Vault.
+  `SecretStore` pointing to `vault.vault.svc.cluster.local`.
+- **HashiCorp Vault Client** (`backend/services/vault_client.py`):
+  `VaultClient` with `read_secret`, `write_secret`, `read_db_credentials`,
+  `read_app_secrets`. Uses `aiohttp` with sync `urllib.request` fallback.
+  Config: `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_ROLE`.
+- **XDP/eBPF Filter Skeleton** (`backend/xdp/xdp_ddos_filter.c`):
+  XDP BPF program with `blocked_ips` LRU hash map; drops matching source IPs at
+  driver level. `backend/xdp/xdp_loader.py`: `XDPLoader` with interface name
+  validation and subprocess (no `shell=True`).
+- **Disaster Recovery Runbook** (`project-docs/DISASTER_RECOVERY.md`):
+  Full runbook covering PostgreSQL PITR restore, Redis Sentinel failover, full cluster
+  rebuild. RTO: 4h, RPO: 15min.
+- **GraphQL Endpoint** (`backend/routers/graphql_router.py`):
+  Strawberry-backed schema with `alerts` and `traffic_logs` queries; graceful stub at
+  `/api/v1/graphql/status` if strawberry not installed. Mounted in `main.py`.
+- **Config additions** (`backend/config.py`):
+  `VAULT_ADDR`, `VAULT_TOKEN`, `VAULT_ROLE`, `FLOW_HMAC_ENABLED`, `FLOW_HMAC_SECRET`,
+  `DTLS_FLOW_ENABLED`, `DTLS_FLOW_PORT`.
+
+#### Frontend Features
+- **TypeScript API Service** (`frontend/src/services/api.ts`, `frontend/src/types/api.d.ts`):
+  Fully typed API client with interfaces for `IAlert`, `ITrafficData`, `IMitigation`,
+  `IISP`, `IUser`, `IRule`, `ISubscription`, `IAttackCampaign`, `ISLARecord`,
+  `IWebhook`, `IThreatScore`. `AxiosInstance` with auth interceptor.
+- **Dark Mode Theming** (`frontend/src/styles/theme.css`, `frontend/src/hooks/useDarkMode.js`):
+  CSS custom properties for light/dark schemes; `prefers-color-scheme` media query plus
+  explicit `.dark-mode` class. `useDarkMode` hook with `localStorage` persistence.
+
+
 
 - **ServiceNow / JIRA / Zendesk Ticketing Integration** (`backend/services/ticketing_service.py`):
   `ServiceNowClient`, `JIRAClient`, `ZendeskClient` classes. All I/O via `aiohttp`

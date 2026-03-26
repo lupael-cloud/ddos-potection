@@ -282,6 +282,19 @@ class Settings(BaseSettings):
     ZENDESK_EMAIL: str = ""
     ZENDESK_API_TOKEN: str = ""
 
+    # HashiCorp Vault
+    VAULT_ADDR: str = ""
+    VAULT_TOKEN: str = ""
+    VAULT_ROLE: str = ""
+
+    # HMAC-MD5 Flow Authentication
+    FLOW_HMAC_ENABLED: bool = False
+    FLOW_HMAC_SECRET: str = ""
+
+    # DTLS Flow Receiver
+    DTLS_FLOW_ENABLED: bool = False
+    DTLS_FLOW_PORT: int = 2057
+
     # ---------------------------------------------------------------------------
     # Sub-model instances – populated after all flat fields are validated.
     # External code may use settings.database.DATABASE_URL etc. as an alternative

@@ -40,6 +40,7 @@ from routers.branding_router import router as branding_router
 from routers.signature_router import router as signature_router
 from routers.risk_router import router as risk_router
 from routers.bi_router import router as bi_router
+from routers.graphql_router import router as graphql_status_router, graphql_app
 from middleware.audit_middleware import AuditMiddleware
 from database import engine, Base, get_db
 from config import settings
@@ -110,6 +111,9 @@ app.include_router(branding_router)
 app.include_router(signature_router)
 app.include_router(risk_router)
 app.include_router(bi_router)
+app.include_router(graphql_status_router, prefix="/api/v1/graphql", tags=["GraphQL"])
+if graphql_app is not None:
+    app.include_router(graphql_app, prefix="/api/v1/graphql")
 
 @app.get("/")
 async def root():
