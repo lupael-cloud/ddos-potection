@@ -1,7 +1,9 @@
 """
 Multi-vendor router driver implementations for ACL/filter push.
-Supports: Cisco IOS/IOS-XR (Netmiko), Juniper JunOS (NAPALM), Arista EOS (eAPI)
+Supports: Cisco IOS/IOS-XR (Netmiko), Juniper JunOS (NAPALM), Arista EOS (eAPI),
+          Nokia SROS (Netmiko)
 """
+import ipaddress
 import logging
 from dataclasses import dataclass, field
 from typing import List, Dict
@@ -201,8 +203,7 @@ class NokiaSROSDriver:
             username: Login username.
             password: Login password.
         """
-        import ipaddress as _ipaddress
-        _ipaddress.ip_address(host)  # raises ValueError for invalid host IP
+        ipaddress.ip_address(host)  # raises ValueError for invalid host IP
         self._host = host
         self._port = port
         self._username = username
@@ -243,9 +244,8 @@ class NokiaSROSDriver:
         Returns:
             True if the entry was pushed successfully, False otherwise.
         """
-        import ipaddress as _ipaddress
         try:
-            _ipaddress.ip_network(prefix, strict=False)
+            ipaddress.ip_network(prefix, strict=False)
         except ValueError:
             logger.error("NokiaSROSDriver.push_acl: invalid prefix %r", prefix)
             return False
@@ -290,9 +290,8 @@ class NokiaSROSDriver:
         Returns:
             True if the entry was removed successfully, False otherwise.
         """
-        import ipaddress as _ipaddress
         try:
-            _ipaddress.ip_network(prefix, strict=False)
+            ipaddress.ip_network(prefix, strict=False)
         except ValueError:
             logger.error("NokiaSROSDriver.withdraw_acl: invalid prefix %r", prefix)
             return False

@@ -142,7 +142,12 @@ class ConnectionTestResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _encrypt_password(plaintext: str) -> str:
-    """Minimal reversible encoding — replace with proper vault integration."""
+    """Encode the password for storage.
+
+    WARNING: This is base64 encoding, NOT cryptographic encryption.
+    Replace with a proper secrets vault (e.g., HashiCorp Vault, AWS Secrets
+    Manager, or Fernet symmetric encryption) before production deployment.
+    """
     import base64
     return base64.b64encode(plaintext.encode()).decode()
 

@@ -1,6 +1,7 @@
 """
 Mitigation automation service
 """
+import logging
 import subprocess
 import ipaddress
 import os
@@ -11,6 +12,8 @@ from datetime import datetime, timezone
 from database import SessionLocal
 from models.models import MitigationAction, Alert
 from config import settings
+
+logger = logging.getLogger(__name__)
 
 def validate_prefix(prefix: str) -> bool:
     """Validate that prefix is a valid IPv4 or IPv6 CIDR notation
@@ -979,8 +982,7 @@ class CooldownManager:
                 self._redis.setex(key, secs, str(end_time))
                 return True
             except Exception as exc:
-                import logging as _logging
-                _logging.getLogger(__name__).error("CooldownManager Redis error: %s", exc)
+                logger.error("CooldownManager Redis error: %s", exc)
         # Fallback
         self._local[key] = end_time
         return True
@@ -1003,8 +1005,7 @@ class CooldownManager:
                     return False
                 return time.time() < float(val)
             except Exception as exc:
-                import logging as _logging
-                _logging.getLogger(__name__).error("CooldownManager Redis error: %s", exc)
+                logger.error("CooldownManager Redis error: %s", exc)
         # Fallback
         end_time = self._local.get(key)
         if end_time is None:
@@ -1026,8 +1027,7 @@ class CooldownManager:
                 self._redis.delete(key)
                 return True
             except Exception as exc:
-                import logging as _logging
-                _logging.getLogger(__name__).error("CooldownManager Redis error: %s", exc)
+                logger.error("CooldownManager Redis error: %s", exc)
         self._local.pop(key, None)
         return True
 
@@ -1047,8 +1047,7 @@ class CooldownManager:
                 ttl = self._redis.ttl(key)
                 return max(0, int(ttl)) if ttl and ttl > 0 else 0
             except Exception as exc:
-                import logging as _logging
-                _logging.getLogger(__name__).error("CooldownManager Redis error: %s", exc)
+                logger.error("CooldownManager Redis error: %s", exc)
         end_time = self._local.get(key)
         if end_time is None:
             return 0
