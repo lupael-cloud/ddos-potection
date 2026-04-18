@@ -11,7 +11,7 @@ Get the DDoS Protection Platform running in under 10 minutes!
 ## Step 1: Clone Repository
 
 ```bash
-git clone https://github.com/i4edubd/ddos-potection.git
+git clone https://github.com/lupael/ddos-potection.git
 cd ddos-potection
 ```
 
