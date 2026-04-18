@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **[Deps] Added `email-validator==2.2.0`** (`backend/requirements.txt`): several routers use Pydantic `EmailStr`; without `email-validator`, importing `main.py` fails during startup/test collection on clean installs.
 - **[Tests] Added `backend/tests/conftest.py` import/bootstrap setup**: ensures backend root is on `sys.path` and defaults `DATABASE_URL` to SQLite in test runs, preventing local PostgreSQL dependency during `pytest` collection.
+- **[API] Fixed `/metrics` content-type header formatting** (`backend/main.py`): return explicit `Content-Type` header to avoid duplicated `charset` suffix (`...; charset=utf-8; charset=utf-8`) in FastAPI `Response(media_type=...)`.
 
 ## [1.3.2] — 2026-04-18
 

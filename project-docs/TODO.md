@@ -32,6 +32,10 @@ Legend: `[ ]` open · `[x]` done · `[~]` in-progress · `[!]` blocked
   - Files: `backend/requirements.txt`, `backend/tests/conftest.py`
   - Fixed: added `email-validator==2.2.0` for Pydantic `EmailStr` imports; added pytest bootstrap to set backend path and default test `DATABASE_URL=sqlite:///:memory:` so tests collect without requiring a local PostgreSQL service.
 
+- [x] **[Bug] `/metrics` endpoint returned duplicated charset in Content-Type**
+  - File: `backend/main.py`
+  - Fixed: set explicit `Content-Type` response header using Prometheus content type constant to avoid `charset` duplication in FastAPI response rendering.
+
 
 - [x] **[Security] PCAP download path traversal**
   - File: `backend/routers/capture_router.py` — `GET /api/v1/capture/download/{file}`
